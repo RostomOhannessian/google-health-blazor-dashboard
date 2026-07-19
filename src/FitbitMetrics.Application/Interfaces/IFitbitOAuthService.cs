@@ -11,4 +11,6 @@ public interface IFitbitOAuthService
     Task<string> GetValidAccessTokenAsync(CancellationToken cancellationToken = default);
 
     Task<FitbitConnectionStatus> GetConnectionStatusAsync(CancellationToken cancellationToken = default);
+
+    Task DisconnectAsync(CancellationToken cancellationToken = default);
 }

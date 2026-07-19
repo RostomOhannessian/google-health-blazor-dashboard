@@ -5,6 +5,7 @@ using FitbitMetrics.Application.Interfaces;
 using FitbitMetrics.Application.Models;
 using FitbitMetrics.Infrastructure.Options;
 using FitbitMetrics.Infrastructure.Persistence;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -13,21 +14,24 @@ namespace FitbitMetrics.Infrastructure.Services;
 internal sealed class FitbitOAuthService(
     FitbitDbContext dbContext,
     IHttpClientFactory httpClientFactory,
-    IOptions<FitbitApiOptions> options) : IFitbitOAuthService
+    IOptions<FitbitApiOptions> options,
+    IDataProtectionProvider dataProtectionProvider) : IFitbitOAuthService
 {
-    private readonly FitbitApiOptions options = options.Value;
+    private readonly FitbitApiOptions _options = options.Value;
+    private readonly IDataProtector _tokenProtector =
+        dataProtectionProvider.CreateProtector("FitbitMetrics.Tokens.v1");
 
     public Task<Uri> BuildAuthorizationUriAsync(string state, CancellationToken cancellationToken = default)
     {
-        var scopeValue = string.Join(' ', options.Scopes);
+        var scopeValue = string.Join(' ', _options.Scopes);
         var query = new Dictionary<string, string>
         {
             ["response_type"] = "code",
-            ["client_id"] = options.ClientId,
-            ["redirect_uri"] = options.RedirectUri,
-            ["scope"] = scopeValue,
-            ["expires_in"] = "604800",
-            ["state"] = state
+            ["client_id"]     = _options.ClientId,
+            ["redirect_uri"]  = _options.RedirectUri,
+            ["scope"]         = scopeValue,
+            ["expires_in"]    = "604800",
+            ["state"]         = state
         };
 
         var queryString = string.Join(
@@ -42,9 +46,9 @@ internal sealed class FitbitOAuthService(
         var token = await RequestTokenAsync(
             new Dictionary<string, string>
             {
-                ["grant_type"] = "authorization_code",
-                ["code"] = code,
-                ["redirect_uri"] = options.RedirectUri
+                ["grant_type"]   = "authorization_code",
+                ["code"]         = code,
+                ["redirect_uri"] = _options.RedirectUri
             },
             cancellationToken);
 
@@ -55,26 +59,26 @@ internal sealed class FitbitOAuthService(
         {
             connection = new FitbitConnection
             {
-                UserKey = DemoUser.Key,
-                FitbitUserId = token.UserId,
-                AccessToken = token.AccessToken,
-                RefreshToken = token.RefreshToken,
-                Scope = token.Scope,
-                AccessTokenExpiresAtUtc = DateTimeOffset.UtcNow.AddSeconds(token.ExpiresInSeconds),
-                CreatedAtUtc = DateTimeOffset.UtcNow,
-                UpdatedAtUtc = DateTimeOffset.UtcNow
+                UserKey                  = DemoUser.Key,
+                FitbitUserId             = token.UserId,
+                AccessToken              = _tokenProtector.Protect(token.AccessToken),
+                RefreshToken             = _tokenProtector.Protect(token.RefreshToken),
+                Scope                    = token.Scope,
+                AccessTokenExpiresAtUtc  = DateTimeOffset.UtcNow.AddSeconds(token.ExpiresInSeconds),
+                CreatedAtUtc             = DateTimeOffset.UtcNow,
+                UpdatedAtUtc             = DateTimeOffset.UtcNow
             };
 
             dbContext.FitbitConnections.Add(connection);
         }
         else
         {
-            connection.FitbitUserId = token.UserId;
-            connection.AccessToken = token.AccessToken;
-            connection.RefreshToken = token.RefreshToken;
-            connection.Scope = token.Scope;
+            connection.FitbitUserId            = token.UserId;
+            connection.AccessToken             = _tokenProtector.Protect(token.AccessToken);
+            connection.RefreshToken            = _tokenProtector.Protect(token.RefreshToken);
+            connection.Scope                   = token.Scope;
             connection.AccessTokenExpiresAtUtc = DateTimeOffset.UtcNow.AddSeconds(token.ExpiresInSeconds);
-            connection.UpdatedAtUtc = DateTimeOffset.UtcNow;
+            connection.UpdatedAtUtc            = DateTimeOffset.UtcNow;
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -91,21 +95,21 @@ internal sealed class FitbitOAuthService(
             var token = await RequestTokenAsync(
                 new Dictionary<string, string>
                 {
-                    ["grant_type"] = "refresh_token",
-                    ["refresh_token"] = connection.RefreshToken
+                    ["grant_type"]    = "refresh_token",
+                    ["refresh_token"] = _tokenProtector.Unprotect(connection.RefreshToken)
                 },
                 cancellationToken);
 
-            connection.AccessToken = token.AccessToken;
-            connection.RefreshToken = token.RefreshToken;
-            connection.Scope = token.Scope;
+            connection.AccessToken             = _tokenProtector.Protect(token.AccessToken);
+            connection.RefreshToken            = _tokenProtector.Protect(token.RefreshToken);
+            connection.Scope                   = token.Scope;
             connection.AccessTokenExpiresAtUtc = DateTimeOffset.UtcNow.AddSeconds(token.ExpiresInSeconds);
-            connection.UpdatedAtUtc = DateTimeOffset.UtcNow;
+            connection.UpdatedAtUtc            = DateTimeOffset.UtcNow;
 
             await dbContext.SaveChangesAsync(cancellationToken);
         }
 
-        return connection.AccessToken;
+        return _tokenProtector.Unprotect(connection.AccessToken);
     }
 
     public async Task<FitbitConnectionStatus> GetConnectionStatusAsync(CancellationToken cancellationToken = default)
@@ -122,6 +126,40 @@ internal sealed class FitbitOAuthService(
                 connection.LastSuccessfulSyncAtUtc);
     }
 
+    public async Task DisconnectAsync(CancellationToken cancellationToken = default)
+    {
+        var connection = await dbContext.FitbitConnections
+            .SingleOrDefaultAsync(item => item.UserKey == DemoUser.Key, cancellationToken);
+
+        if (connection is null)
+            return;
+
+        // Attempt to revoke the token with Fitbit — best effort; ignore failures.
+        try
+        {
+            var refreshToken = _tokenProtector.Unprotect(connection.RefreshToken);
+            await RevokeTokenAsync(refreshToken, cancellationToken);
+        }
+        catch
+        {
+            // Revocation failure is non-fatal; continue with local cleanup.
+        }
+
+        dbContext.FitbitConnections.Remove(connection);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task RevokeTokenAsync(string token, CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.fitbit.com/oauth2/revoke");
+        request.Content    = new FormUrlEncodedContent(new Dictionary<string, string> { ["token"] = token });
+        request.Headers.Authorization = new AuthenticationHeaderValue("Basic", BuildBasicAuthHeader());
+
+        var httpClient = httpClientFactory.CreateClient();
+        using var response = await httpClient.SendAsync(request, cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
     private async Task<TokenResult> RequestTokenAsync(
         IReadOnlyDictionary<string, string> content,
         CancellationToken cancellationToken)
@@ -136,19 +174,19 @@ internal sealed class FitbitOAuthService(
 
         if (!response.IsSuccessStatusCode)
         {
+            // Limit error snippet; never log the raw request (contains credentials).
+            var snippet = responseBody.Length > 200 ? responseBody[..200] : responseBody;
             throw new HttpRequestException(
-                $"Fitbit token request failed with status {(int)response.StatusCode}: {responseBody}");
+                $"Fitbit token request failed ({(int)response.StatusCode}): {snippet}");
         }
 
-        var token = TokenResult.Deserialize(responseBody)
+        return TokenResult.Deserialize(responseBody)
             ?? throw new InvalidOperationException("Fitbit token response was empty.");
-
-        return token;
     }
 
     private string BuildBasicAuthHeader()
     {
-        var credentials = $"{options.ClientId}:{options.ClientSecret}";
+        var credentials = $"{_options.ClientId}:{_options.ClientSecret}";
         return Convert.ToBase64String(Encoding.UTF8.GetBytes(credentials));
     }
 

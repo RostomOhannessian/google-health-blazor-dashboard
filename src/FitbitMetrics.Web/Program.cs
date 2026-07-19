@@ -78,6 +78,12 @@ app.MapGet(
         return Results.Redirect("/");
     });
 
+app.MapPost("/api/fitbit/disconnect", async (IFitbitOAuthService authService, CancellationToken cancellationToken) =>
+{
+    await authService.DisconnectAsync(cancellationToken);
+    return Results.Ok();
+}).DisableAntiforgery();
+
 app.MapPost("/api/fitbit/sync", async (int? days, IFitbitSyncService syncService, CancellationToken cancellationToken) =>
 {
     var requestedDays = days is > 0 and <= 90 ? days.Value : 7;

@@ -28,6 +28,7 @@
             @(isSyncing ? "Syncing…" : $"Sync last {selectedDays} days")
         </button>
         <a class="btn btn-outline-secondary btn-sm align-self-center" href="/api/fitbit/connect">Reconnect</a>
+        <button class="btn btn-outline-danger btn-sm align-self-center" type="button" @onclick="DisconnectAsync">Disconnect</button>
     }
     <button class="btn btn-outline-secondary" type="button" @onclick="LoadDataAsync">Refresh</button>
 </div>
@@ -269,6 +270,20 @@
     {
         selectedDays = days;
         await LoadDataAsync();
+    }
+
+    private async Task DisconnectAsync()
+    {
+        try
+        {
+            lastError = null;
+            await OAuthService.DisconnectAsync();
+            await LoadDataAsync();
+        }
+        catch (Exception ex)
+        {
+            lastError = ex.Message;
+        }
     }
 
     private static string Display<T>(T? value) where T : struct

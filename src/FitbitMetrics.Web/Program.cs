@@ -1,9 +1,11 @@
 using FitbitMetrics.Application.Interfaces;
+using FitbitMetrics.Application.Models;
 using FitbitMetrics.Infrastructure.DependencyInjection;
 using FitbitMetrics.Infrastructure.Persistence;
 using FitbitMetrics.Web.Components;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -97,6 +99,32 @@ app.MapGet("/api/metrics", async (int? days, IMetricQueryService metricQueryServ
     var metrics = await metricQueryService.GetRecentMetricsAsync(requestedDays, cancellationToken);
     return Results.Ok(metrics);
 });
+
+app.MapGet("/api/metrics/export", async (int? days, IMetricQueryService metricQueryService, CancellationToken cancellationToken) =>
+{
+    var requestedDays = days is > 0 and <= 365 ? days.Value : 365;
+    var metrics = await metricQueryService.GetRecentMetricsAsync(requestedDays, cancellationToken);
+
+    var sb = new StringBuilder();
+    sb.AppendLine("Date,RestingHR_bpm,HRV_RMSSD_ms,VO2Max_ml_kg_min,Calories_kcal,Carbs_g,Fat_g,Protein_g,Fiber_g,Sodium_mg,Potassium_mg,Calcium_mg,Iron_mg");
+    foreach (var m in metrics.OrderBy(m => m.MetricDate))
+    {
+        sb.AppendLine(
+            $"{m.MetricDate},{m.RestingHeartRateBpm},{m.HrvRmssdMilliseconds},{m.Vo2MaxMlKgMin}," +
+            $"{m.ConsumedCaloriesKcal},{m.CarbohydratesGrams},{m.FatGrams},{m.ProteinGrams}," +
+            $"{m.FiberGrams},{m.SodiumMilligrams},{m.PotassiumMilligrams},{m.CalciumMilligrams},{m.IronMilligrams}");
+    }
+
+    var filename = $"fitbit-metrics-{DateOnly.FromDateTime(DateTime.UtcNow):yyyy-MM-dd}.csv";
+    return Results.File(Encoding.UTF8.GetBytes(sb.ToString()), "text/csv", filename);
+});
+
+app.MapPost("/api/demo/seed", async (int? days, IDemoSeedService demoSeedService, CancellationToken cancellationToken) =>
+{
+    var dayCount = days is > 0 and <= 90 ? days.Value : 30;
+    var inserted = await demoSeedService.SeedAsync(dayCount, cancellationToken);
+    return Results.Ok(new { Inserted = inserted, Requested = dayCount });
+}).DisableAntiforgery();
 
 app.Run();
 

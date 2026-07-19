@@ -51,6 +51,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IFitbitOAuthService, FitbitOAuthService>();
         services.AddScoped<IFitbitSyncService, FitbitSyncService>();
         services.AddScoped<IMetricQueryService, MetricQueryService>();
+        services.AddScoped<IDemoSeedService, DemoSeedService>();
 
         services.AddHostedService<FitbitDailySyncBackgroundService>();
 

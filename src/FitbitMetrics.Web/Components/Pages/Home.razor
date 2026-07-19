@@ -3,6 +3,7 @@
 @inject IFitbitOAuthService OAuthService
 @inject IFitbitSyncService SyncService
 @inject IMetricQueryService MetricQueryService
+@inject IDemoSeedService DemoSeedService
 @inject IJSRuntime JS
 
 <PageTitle>Fitbit Metrics</PageTitle>
@@ -106,7 +107,10 @@
 
 <div class="d-flex align-items-baseline justify-content-between mb-2">
     <h2 class="h5 mb-0">Daily snapshots</h2>
-    <small class="text-muted">@metrics.Count of @selectedDays days · — = not available from Fitbit</small>
+    <div class="d-flex align-items-center gap-3">
+        <a href="/api/metrics/export?days=@selectedDays" class="small text-decoration-none" download>⬇ Export CSV</a>
+        <small class="text-muted">@metrics.Count of @selectedDays days · — = not available from Fitbit</small>
+    </div>
 </div>
 <div class="table-responsive">
     <table class="table table-striped table-sm table-hover">
@@ -197,13 +201,31 @@
     </details>
 }
 
+@if (metrics.Count == 0)
+{
+    <div class="mt-4 p-3 border rounded bg-light">
+        <p class="mb-2 text-muted small">
+            <strong>No Fitbit account?</strong> Seed 30 days of synthetic demo data to explore the dashboard.
+        </p>
+        <button class="btn btn-sm btn-outline-secondary" type="button" @onclick="SeedDemoDataAsync" disabled="@isSeeding">
+            @(isSeeding ? "Seeding…" : "Insert demo data (30 days)")
+        </button>
+        @if (!string.IsNullOrWhiteSpace(seedMessage))
+        {
+            <span class="ms-2 text-muted small">@seedMessage</span>
+        }
+    </div>
+}
+
 @code {
     private readonly List<DailyMetricSnapshot> metrics = [];
     private readonly List<SyncHistoryEntry> syncHistory = [];
     private FitbitConnectionStatus? connectionStatus;
     private MetricSummary? summary;
     private bool isSyncing;
+    private bool isSeeding;
     private string? lastError;
+    private string? seedMessage;
     private int selectedDays = 30;
     private bool chartNeedsRender;
 
@@ -283,6 +305,27 @@
         catch (Exception ex)
         {
             lastError = ex.Message;
+        }
+    }
+
+    private async Task SeedDemoDataAsync()
+    {
+        try
+        {
+            isSeeding   = true;
+            seedMessage = null;
+            StateHasChanged();
+            var inserted = await DemoSeedService.SeedAsync(30);
+            seedMessage = $"{inserted} day(s) of demo data inserted.";
+            await LoadDataAsync();
+        }
+        catch (Exception ex)
+        {
+            seedMessage = ex.Message;
+        }
+        finally
+        {
+            isSeeding = false;
         }
     }
 

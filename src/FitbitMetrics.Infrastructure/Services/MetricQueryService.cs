@@ -23,4 +23,16 @@ internal sealed class MetricQueryService(FitbitDbContext dbContext) : IMetricQue
             .Take(dayCount)
             .ToListAsync(cancellationToken);
     }
+
+    public async Task<IReadOnlyList<SyncHistoryEntry>> GetRecentSyncHistoryAsync(
+        int count = 10,
+        CancellationToken cancellationToken = default)
+    {
+        return await dbContext.SyncHistory
+            .AsNoTracking()
+            .Where(entry => entry.UserKey == DemoUser.Key)
+            .OrderByDescending(entry => entry.StartedAtUtc)
+            .Take(count)
+            .ToListAsync(cancellationToken);
+    }
 }

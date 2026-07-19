@@ -9,6 +9,8 @@ public sealed class FitbitDbContext(DbContextOptions<FitbitDbContext> options) :
 
     public DbSet<DailyMetricSnapshot> DailyMetricSnapshots => Set<DailyMetricSnapshot>();
 
+    public DbSet<SyncHistoryEntry> SyncHistory => Set<SyncHistoryEntry>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<FitbitConnection>(entity =>
@@ -39,6 +41,15 @@ public sealed class FitbitDbContext(DbContextOptions<FitbitDbContext> options) :
             entity.Property(snapshot => snapshot.PotassiumMilligrams).HasPrecision(12, 2);
             entity.Property(snapshot => snapshot.CalciumMilligrams).HasPrecision(12, 2);
             entity.Property(snapshot => snapshot.IronMilligrams).HasPrecision(12, 2);
+        });
+
+        modelBuilder.Entity<SyncHistoryEntry>(entity =>
+        {
+            entity.ToTable("sync_history");
+            entity.HasKey(entry => entry.Id);
+            entity.HasIndex(entry => new { entry.UserKey, entry.StartedAtUtc });
+            entity.Property(entry => entry.UserKey).HasMaxLength(120).IsRequired();
+            entity.Property(entry => entry.ErrorMessage).HasMaxLength(2000);
         });
     }
 }

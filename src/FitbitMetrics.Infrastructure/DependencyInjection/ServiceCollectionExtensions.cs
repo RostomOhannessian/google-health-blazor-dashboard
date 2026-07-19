@@ -25,6 +25,9 @@ public static class ServiceCollectionExtensions
                 "FitbitApi options must contain ClientId, ClientSecret, RedirectUri, and at least one scope.")
             .ValidateOnStart();
 
+        services.AddOptions<FitbitDailySyncOptions>()
+            .Bind(configuration.GetSection(FitbitDailySyncOptions.SectionName));
+
         var connectionString = configuration.GetConnectionString("FitbitMetricsDb")
             ?? "Data Source=fitbit-metrics.db";
 
@@ -36,12 +39,20 @@ public static class ServiceCollectionExtensions
         services.AddHttpClient<FitbitApiClient>(client =>
         {
             client.BaseAddress = new Uri("https://api.fitbit.com");
-            client.Timeout = TimeSpan.FromSeconds(30);
+            client.Timeout     = TimeSpan.FromSeconds(30);
+        })
+        .AddStandardResilienceHandler(resilience =>
+        {
+            resilience.Retry.MaxRetryAttempts    = 3;
+            resilience.Retry.UseJitter           = true;
+            resilience.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(90);
         });
 
         services.AddScoped<IFitbitOAuthService, FitbitOAuthService>();
         services.AddScoped<IFitbitSyncService, FitbitSyncService>();
         services.AddScoped<IMetricQueryService, MetricQueryService>();
+
+        services.AddHostedService<FitbitDailySyncBackgroundService>();
 
         return services;
     }

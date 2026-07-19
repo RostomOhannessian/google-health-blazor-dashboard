@@ -3,22 +3,33 @@
 @inject IFitbitOAuthService OAuthService
 @inject IFitbitSyncService SyncService
 @inject IMetricQueryService MetricQueryService
+@inject IJSRuntime JS
 
-<PageTitle>Fitbit Metrics Dashboard</PageTitle>
+<PageTitle>Fitbit Metrics</PageTitle>
 
-<h1>Fitbit Metrics Dashboard</h1>
+<div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-1">
+    <h1 class="mb-0">Fitbit Metrics</h1>
+    <div class="btn-group btn-group-sm" role="group" aria-label="Date range">
+        <button type="button" class="btn @(selectedDays == 7 ? "btn-primary" : "btn-outline-primary")" @onclick="@(() => ChangeRangeAsync(7))">7 d</button>
+        <button type="button" class="btn @(selectedDays == 30 ? "btn-primary" : "btn-outline-primary")" @onclick="@(() => ChangeRangeAsync(30))">30 d</button>
+        <button type="button" class="btn @(selectedDays == 90 ? "btn-primary" : "btn-outline-primary")" @onclick="@(() => ChangeRangeAsync(90))">90 d</button>
+    </div>
+</div>
+<p class="text-muted mb-3">Daily health and nutrition metrics, synced from the Fitbit Web API and persisted locally.</p>
 
-<p>
-    Your daily Fitbit health and nutrition metrics, synced from the Fitbit Web API and stored locally.
-    Connect once, sync as often as you like, and track trends over time.
-</p>
-
-<div class="d-flex gap-2 mb-3">
-    <a class="btn btn-primary" href="/api/fitbit/connect">Connect Fitbit</a>
-    <button class="btn btn-outline-primary" type="button" @onclick="SyncNowAsync" disabled="@isSyncing">
-        @(isSyncing ? "Syncing..." : "Sync last 7 days")
-    </button>
-    <button class="btn btn-outline-secondary" type="button" @onclick="LoadDataAsync">Refresh dashboard</button>
+<div class="d-flex flex-wrap gap-2 mb-4">
+    @if (connectionStatus?.IsConnected != true)
+    {
+        <a class="btn btn-primary" href="/api/fitbit/connect">Connect Fitbit</a>
+    }
+    else
+    {
+        <button class="btn btn-primary" type="button" @onclick="SyncNowAsync" disabled="@isSyncing">
+            @(isSyncing ? "Syncing…" : $"Sync last {selectedDays} days")
+        </button>
+        <a class="btn btn-outline-secondary btn-sm align-self-center" href="/api/fitbit/connect">Reconnect</a>
+    }
+    <button class="btn btn-outline-secondary" type="button" @onclick="LoadDataAsync">Refresh</button>
 </div>
 
 @if (!string.IsNullOrWhiteSpace(lastError))
@@ -27,58 +38,89 @@
 }
 
 <div class="row g-3 mb-4">
-    <div class="col-md-4">
-        <div class="card">
+    <div class="col-sm-6 col-xl-3">
+        <div class="card h-100 @(connectionStatus?.IsConnected == true ? "border-success" : "border-warning")">
             <div class="card-body">
-                <h5 class="card-title">Connection</h5>
-                <p class="card-text">
-                    @(connectionStatus?.IsConnected == true ? "Connected" : "Not connected")
-                </p>
-                @if (connectionStatus?.AccessTokenExpiresAtUtc is not null)
+                <h6 class="card-subtitle text-muted mb-1">Fitbit connection</h6>
+                @if (connectionStatus?.IsConnected == true)
                 {
-                    <small class="text-muted">Token expires: @connectionStatus.AccessTokenExpiresAtUtc.Value.LocalDateTime</small>
+                    <p class="card-text fw-semibold text-success mb-0">Connected ✓</p>
+                    @if (connectionStatus.AccessTokenExpiresAtUtc is not null)
+                    {
+                        <small class="text-muted">Token expires @connectionStatus.AccessTokenExpiresAtUtc.Value.LocalDateTime.ToString("g")</small>
+                    }
+                }
+                else
+                {
+                    <p class="card-text fw-semibold text-warning mb-0">Not connected</p>
                 }
             </div>
         </div>
     </div>
-    <div class="col-md-4">
-        <div class="card">
+    <div class="col-sm-6 col-xl-3">
+        <div class="card h-100">
             <div class="card-body">
-                <h5 class="card-title">Last successful sync</h5>
-                <p class="card-text">
-                    @(connectionStatus?.LastSuccessfulSyncAtUtc?.LocalDateTime.ToString("g") ?? "No sync yet")
+                <h6 class="card-subtitle text-muted mb-1">Last sync</h6>
+                <p class="card-text fw-semibold mb-0">
+                    @(connectionStatus?.LastSuccessfulSyncAtUtc is null
+                        ? "—"
+                        : connectionStatus.LastSuccessfulSyncAtUtc.Value.LocalDateTime.ToString("g"))
                 </p>
             </div>
         </div>
     </div>
-    <div class="col-md-4">
-        <div class="card">
+    <div class="col-sm-6 col-xl-3">
+        <div class="card h-100">
             <div class="card-body">
-                <h5 class="card-title">Loaded snapshots</h5>
-                <p class="card-text">@metrics.Count</p>
+                <h6 class="card-subtitle text-muted mb-1">Resting HR</h6>
+                <p class="card-text fw-semibold mb-0">
+                    @SummaryText(summary?.LatestRestingHeartRateBpm, summary?.AvgRestingHeartRateBpm7d, "bpm")
+                    <span class="@TrendClass(summary?.HeartRateTrend)">@TrendIcon(summary?.HeartRateTrend)</span>
+                </p>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <h6 class="card-subtitle text-muted mb-1">HRV RMSSD</h6>
+                <p class="card-text fw-semibold mb-0">
+                    @SummaryText(summary?.LatestHrvRmssd, summary?.AvgHrvRmssd7d, "ms")
+                    <span class="@TrendClass(summary?.HrvTrend)">@TrendIcon(summary?.HrvTrend)</span>
+                </p>
             </div>
         </div>
     </div>
 </div>
 
-<h2>Recent daily metrics</h2>
-<p class="text-muted">
-    Empty values mean Fitbit did not return that metric for the day/account/device.
-</p>
+@if (metrics.Any(m => m.RestingHeartRateBpm.HasValue || m.HrvRmssdMilliseconds.HasValue))
+{
+    <div class="card mb-4">
+        <div class="card-header fw-semibold">Heart rate &amp; HRV trend</div>
+        <div class="card-body py-2">
+            <canvas id="metricsChart" style="max-height: 260px;"></canvas>
+        </div>
+    </div>
+}
+
+<div class="d-flex align-items-baseline justify-content-between mb-2">
+    <h2 class="h5 mb-0">Daily snapshots</h2>
+    <small class="text-muted">@metrics.Count of @selectedDays days · — = not available from Fitbit</small>
+</div>
 
 <div class="table-responsive">
-    <table class="table table-striped table-sm">
+    <table class="table table-striped table-sm table-hover">
         <thead>
             <tr>
                 <th>Date</th>
                 <th>Resting HR</th>
-                <th>HRV (RMSSD)</th>
+                <th>HRV (ms)</th>
                 <th>VO2 Max</th>
                 <th>Calories</th>
-                <th>Carbs</th>
-                <th>Fat</th>
-                <th>Protein</th>
-                <th>Fiber</th>
+                <th>Carbs (g)</th>
+                <th>Fat (g)</th>
+                <th>Protein (g)</th>
+                <th>Fiber (g)</th>
                 <th>Sodium (mg)</th>
                 <th>Potassium (mg)</th>
                 <th>Calcium (mg)</th>
@@ -89,7 +131,11 @@
             @if (metrics.Count == 0)
             {
                 <tr>
-                    <td colspan="13" class="text-center">No data yet. Connect Fitbit and run sync.</td>
+                    <td colspan="13" class="text-center text-muted py-3">
+                        @(connectionStatus?.IsConnected == true
+                            ? "No data for this range — run a sync first."
+                            : "Connect Fitbit and run sync to start tracking.")
+                    </td>
                 </tr>
             }
             else
@@ -97,7 +143,7 @@
                 @foreach (var metric in metrics)
                 {
                     <tr>
-                        <td>@metric.MetricDate</td>
+                        <td>@metric.MetricDate.ToString("MMM d")</td>
                         <td>@Display(metric.RestingHeartRateBpm)</td>
                         <td>@Display(metric.HrvRmssdMilliseconds)</td>
                         <td>@Display(metric.Vo2MaxMlKgMin)</td>
@@ -120,12 +166,28 @@
 @code {
     private readonly List<DailyMetricSnapshot> metrics = [];
     private FitbitConnectionStatus? connectionStatus;
+    private MetricSummary? summary;
     private bool isSyncing;
     private string? lastError;
+    private int selectedDays = 30;
+    private bool chartNeedsRender;
 
     protected override async Task OnInitializedAsync()
     {
         await LoadDataAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (chartNeedsRender && metrics.Any(m => m.RestingHeartRateBpm.HasValue || m.HrvRmssdMilliseconds.HasValue))
+        {
+            chartNeedsRender = false;
+            var ordered = metrics.OrderBy(m => m.MetricDate).ToList();
+            var labels   = ordered.Select(m => m.MetricDate.ToString("MMM d")).ToArray();
+            var hrData   = ordered.Select(m => (object?)(m.RestingHeartRateBpm.HasValue ? m.RestingHeartRateBpm.Value : (int?)null)).ToArray();
+            var hrvData  = ordered.Select(m => (object?)(m.HrvRmssdMilliseconds.HasValue ? (double)m.HrvRmssdMilliseconds.Value : (double?)null)).ToArray();
+            await JS.InvokeVoidAsync("FitbitCharts.render", "metricsChart", labels, hrData, hrvData);
+        }
     }
 
     private async Task SyncNowAsync()
@@ -134,12 +196,13 @@
         {
             lastError = null;
             isSyncing = true;
-            await SyncService.SyncRecentDaysAsync(7);
+            StateHasChanged();
+            await SyncService.SyncRecentDaysAsync(selectedDays);
             await LoadDataAsync();
         }
-        catch (Exception exception)
+        catch (Exception ex)
         {
-            lastError = exception.Message;
+            lastError = ex.Message;
         }
         finally
         {
@@ -153,16 +216,48 @@
         {
             lastError = null;
             connectionStatus = await OAuthService.GetConnectionStatusAsync();
-            var recentMetrics = await MetricQueryService.GetRecentMetricsAsync(30);
+            var loaded = await MetricQueryService.GetRecentMetricsAsync(selectedDays);
             metrics.Clear();
-            metrics.AddRange(recentMetrics);
+            metrics.AddRange(loaded);
+            summary = MetricSummary.From(metrics);
+            chartNeedsRender = true;
         }
-        catch (Exception exception)
+        catch (Exception ex)
         {
-            lastError = exception.Message;
+            lastError = ex.Message;
         }
     }
 
+    private async Task ChangeRangeAsync(int days)
+    {
+        selectedDays = days;
+        await LoadDataAsync();
+    }
+
     private static string Display<T>(T? value) where T : struct
-        => value is null ? "—" : value.Value.ToString() ?? "—";
+        => value is null ? "—" : value.Value.ToString()!;
+
+    private static string SummaryText(object? latest, double? avg7d, string unit)
+    {
+        if (latest is null) return "—";
+        var latestStr = latest is decimal d ? d.ToString("F1") : latest.ToString()!;
+        var avgStr    = avg7d is null ? "—" : avg7d.Value.ToString("F1");
+        return $"{latestStr} {unit}  ·  avg {avgStr}";
+    }
+
+    private static string TrendIcon(TrendDirection? trend) => trend switch
+    {
+        TrendDirection.Up       => " ↑",
+        TrendDirection.Down     => " ↓",
+        TrendDirection.Stable   => " →",
+        _                       => ""
+    };
+
+    private static string TrendClass(TrendDirection? trend) => trend switch
+    {
+        TrendDirection.Up or TrendDirection.Down => "text-primary",
+        TrendDirection.Stable                    => "text-secondary",
+        _                                        => ""
+    };
 }
+

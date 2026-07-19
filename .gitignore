@@ -22,6 +22,7 @@ TestResults/
 
 # Logs
 *.log
+logs/
 
 # Local SQLite runtime files
 health-metrics.db

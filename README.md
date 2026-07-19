@@ -35,10 +35,11 @@ flowchart TD
 | **OAuth security** | Google Auth library, one-time state nonce, offline consent, encrypted token persistence, best-effort revoke | Demonstrates real OAuth lifecycle work, not only happy-path redirects |
 | **Token storage** | ASP.NET Core Data Protection with a Google-specific purpose string | Tokens are encrypted at rest in SQLite |
 | **API client** | Typed `HttpClient` for `https://health.googleapis.com/v4/` plus transient-failure resilience | Avoids socket exhaustion and keeps HTTP policy centralized |
+| **Observability** | Structured Serilog console/file logging plus privacy-safe Google Health request/response telemetry | Makes daily troubleshooting possible without leaking secrets or health payloads by default |
 | **Daily sync** | Range-based sync, idempotent merge on `(UserKey, MetricDate)`, sync history records | Safe to re-run and transparent when a sync fails |
 | **Data contract** | Active dashboard fields are limited to confirmed Google Health data types | Avoids permanently empty Fitbit-era columns |
 | **Migration safety** | Legacy credentials are removed; useful historical metrics are preserved; retired columns are archived | Direct cutover without silently discarding historical personal data |
-| **Tests** | 30 tests covering persistence, summaries, demo seed, Google Health client fixtures, and endpoints | Recruiter-visible quality signal |
+| **Tests** | Tests cover persistence, summaries, demo seed, Google Health client fixtures, endpoint behavior, migration safety, and logging redaction | Recruiter-visible quality signal |
 
 ## Active metric contract
 
@@ -125,6 +126,29 @@ dotnet test .\HealthMetrics.slnx
 ```
 
 Automatic sync is disabled by default. Enable it only after Google OAuth credentials are configured.
+
+### Logging
+
+Structured logs are written to the console and to rolling local files under `logs\health-metrics-.log`. Log files are ignored by git.
+
+Google Health outbound request/response telemetry is privacy-safe by default:
+
+- every request logs method, sanitized path, operation, data type, elapsed time, and status;
+- request bodies are logged for Google Health rollup calls because they only contain operational date-window parameters;
+- response body logging is disabled by default because responses can include personal health data.
+
+To temporarily inspect sanitized, truncated response bodies during local debugging, set:
+
+```json
+{
+  "GoogleHealthHttpLogging": {
+    "LogResponseBodies": true,
+    "MaxBodyCharacters": 4096
+  }
+}
+```
+
+Do not enable response body logging in shared environments. OAuth codes, access tokens, refresh tokens, client secrets, authorization headers, full authorization URLs, and page token values are never logged intentionally.
 
 ## Security notes
 

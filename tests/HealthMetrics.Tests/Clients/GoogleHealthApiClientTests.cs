@@ -1,5 +1,9 @@
 using System.Net;
 using HealthMetrics.Infrastructure.Clients;
+using HealthMetrics.Infrastructure.Options;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 
 namespace HealthMetrics.Tests.Clients;
 
@@ -164,14 +168,82 @@ public sealed class GoogleHealthApiClientTests
         Assert.True(exception.IsAuthorizationFailure);
     }
 
-    private static GoogleHealthApiClient CreateClient(HttpMessageHandler handler)
+    [Fact]
+    public async Task FetchDailyMetricsAsync_RedactsPageTokensInFailureMessages()
+    {
+        var restingHeartRateCalls = 0;
+        var handler = new StubHttpMessageHandler(request =>
+        {
+            var path = request.RequestUri!.ToString();
+            if (path.Contains("users/me/settings"))
+                return Json("""{"timeZone":"UTC"}""");
+
+            if (path.Contains("daily-resting-heart-rate"))
+            {
+                restingHeartRateCalls++;
+                return restingHeartRateCalls == 1
+                    ? Json("""{"nextPageToken":"page-secret","dataPoints":[]}""")
+                    : new HttpResponseMessage(HttpStatusCode.Forbidden)
+                    {
+                        Content = new StringContent("""{"error":"bad_page","nextPageToken":"response-secret"}""")
+                    };
+            }
+
+            return Json("""{}""");
+        });
+
+        var client = CreateClient(handler);
+
+        var exception = await Assert.ThrowsAsync<GoogleHealthApiException>(
+            () => client.FetchDailyMetricsAsync("access-token-secret", new DateOnly(2026, 7, 18), new DateOnly(2026, 7, 18), CancellationToken.None));
+
+        Assert.DoesNotContain("page-secret", exception.Message);
+        Assert.DoesNotContain("response-secret", exception.Message);
+        Assert.Contains("[redacted]", exception.Message);
+    }
+
+    [Fact]
+    public async Task FetchDailyMetricsAsync_LogsRequestAndResponseBodiesWithRedactionWhenEnabled()
+    {
+        var logger = new CapturingLogger<GoogleHealthApiClient>();
+        var handler = new StubHttpMessageHandler(request =>
+        {
+            if (request.RequestUri!.ToString().Contains("users/me/settings"))
+                return Json("""{"timeZone":"America/Toronto","nextPageToken":"response-secret"}""");
+
+            return Json("""{}""");
+        });
+
+        var client = CreateClient(
+            handler,
+            new GoogleHealthHttpLoggingOptions { LogRequestBodies = true, LogResponseBodies = true, MaxBodyCharacters = 4096 },
+            logger);
+
+        await client.FetchDailyMetricsAsync("access-token-secret", new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 1), CancellationToken.None);
+
+        var messages = string.Join('\n', logger.Messages);
+        Assert.Contains("Google Health API request body", messages);
+        Assert.Contains("\"timeZone\":\"America/Toronto\"", messages);
+        Assert.Contains("Google Health API response body", messages);
+        Assert.Contains("\"nextPageToken\":\"[redacted]\"", messages);
+        Assert.DoesNotContain("response-secret", messages);
+        Assert.DoesNotContain("access-token-secret", messages);
+    }
+
+    private static GoogleHealthApiClient CreateClient(
+        HttpMessageHandler handler,
+        GoogleHealthHttpLoggingOptions? options = null,
+        ILogger<GoogleHealthApiClient>? logger = null)
     {
         var httpClient = new HttpClient(handler)
         {
             BaseAddress = new Uri("https://health.googleapis.com/v4/")
         };
 
-        return new GoogleHealthApiClient(httpClient);
+        return new GoogleHealthApiClient(
+            httpClient,
+            Options.Create(options ?? new GoogleHealthHttpLoggingOptions()),
+            logger ?? NullLogger<GoogleHealthApiClient>.Instance);
     }
 
     private static HttpResponseMessage Json(string json) =>
@@ -194,6 +266,33 @@ public sealed class GoogleHealthApiClientTests
 
             Requests.Add(new CapturedRequest(request.Method, request.RequestUri!.ToString(), body));
             return responder(request);
+        }
+    }
+
+    private sealed class CapturingLogger<T> : ILogger<T>
+    {
+        public List<string> Messages { get; } = [];
+
+        public IDisposable BeginScope<TState>(TState state)
+            where TState : notnull => NullLogScope.Instance;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter) =>
+            Messages.Add(formatter(state, exception));
+    }
+
+    private sealed class NullLogScope : IDisposable
+    {
+        public static readonly NullLogScope Instance = new();
+
+        public void Dispose()
+        {
         }
     }
 }

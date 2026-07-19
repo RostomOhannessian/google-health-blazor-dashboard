@@ -8,6 +8,7 @@ using HealthMetrics.Infrastructure.Options;
 using HealthMetrics.Infrastructure.Persistence;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace HealthMetrics.Infrastructure.Services;
@@ -16,7 +17,8 @@ internal sealed class GoogleHealthAuthorizationService(
     HealthMetricsDbContext dbContext,
     GoogleHealthApiClient googleHealthApiClient,
     IOptions<GoogleHealthApiOptions> options,
-    IDataProtectionProvider dataProtectionProvider) : IHealthAuthorizationService
+    IDataProtectionProvider dataProtectionProvider,
+    ILogger<GoogleHealthAuthorizationService> logger) : IHealthAuthorizationService
 {
     private readonly GoogleHealthApiOptions _options = options.Value;
     private readonly IDataProtector _tokenProtector =
@@ -24,23 +26,38 @@ internal sealed class GoogleHealthAuthorizationService(
 
     public Task<Uri> BuildAuthorizationUriAsync(string state, CancellationToken cancellationToken = default)
     {
+        logger.LogInformation("Building Google Health authorization URL for {ScopeCount} scope(s).", _options.Scopes.Length);
         var request = CreateFlow(prompt: "consent").CreateAuthorizationCodeRequest(_options.RedirectUri);
         request.State = state;
 
-        return Task.FromResult(request.Build());
+        var uri = request.Build();
+        logger.LogInformation("Google Health authorization URL built.");
+        return Task.FromResult(uri);
     }
 
     public async Task HandleAuthorizationCodeAsync(string code, CancellationToken cancellationToken = default)
     {
-        var token = await CreateFlow(prompt: "consent")
-            .ExchangeCodeForTokenAsync(LocalUser.Key, code, _options.RedirectUri, cancellationToken);
+        logger.LogInformation("Google Health authorization code exchange started.");
+        TokenResponse token;
+        try
+        {
+            token = await CreateFlow(prompt: "consent")
+                .ExchangeCodeForTokenAsync(LocalUser.Key, code, _options.RedirectUri, cancellationToken);
+        }
+        catch (TokenResponseException ex)
+        {
+            logger.LogError(ex, "Google Health authorization code exchange failed.");
+            throw;
+        }
 
         if (string.IsNullOrWhiteSpace(token.AccessToken) || string.IsNullOrWhiteSpace(token.RefreshToken))
             throw new InvalidOperationException("Google OAuth token response did not include both access and refresh tokens.");
 
+        logger.LogInformation("Google Health authorization code exchange succeeded.");
         var googleUserId = await googleHealthApiClient.GetIdentityAsync(token.AccessToken, cancellationToken);
         var connection = await dbContext.HealthConnections
             .SingleOrDefaultAsync(item => item.UserKey == LocalUser.Key, cancellationToken);
+        var isNewConnection = connection is null;
 
         if (connection is null)
         {
@@ -71,6 +88,12 @@ internal sealed class GoogleHealthAuthorizationService(
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+        logger.LogInformation(
+            "Google Health connection {ConnectionAction}. ScopeCount: {ScopeCount}; AccessTokenExpiresAtUtc: {AccessTokenExpiresAtUtc}; RefreshTokenExpiresAtUtc: {RefreshTokenExpiresAtUtc}.",
+            isNewConnection ? "created" : "replaced",
+            connection.Scope.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length,
+            connection.AccessTokenExpiresAtUtc,
+            connection.RefreshTokenExpiresAtUtc);
     }
 
     public async Task<string> GetValidAccessTokenAsync(CancellationToken cancellationToken = default)
@@ -81,9 +104,19 @@ internal sealed class GoogleHealthAuthorizationService(
 
         if (connection.AccessTokenExpiresAtUtc <= DateTimeOffset.UtcNow.AddMinutes(2))
         {
+            logger.LogInformation("Google Health access token refresh started. AccessTokenExpiresAtUtc: {AccessTokenExpiresAtUtc}.", connection.AccessTokenExpiresAtUtc);
             var refreshToken = _tokenProtector.Unprotect(connection.RefreshToken);
-            var token = await CreateFlow(prompt: null)
-                .RefreshTokenAsync(LocalUser.Key, refreshToken, cancellationToken);
+            TokenResponse token;
+            try
+            {
+                token = await CreateFlow(prompt: null)
+                    .RefreshTokenAsync(LocalUser.Key, refreshToken, cancellationToken);
+            }
+            catch (TokenResponseException ex)
+            {
+                logger.LogError(ex, "Google Health access token refresh failed.");
+                throw;
+            }
 
             if (string.IsNullOrWhiteSpace(token.AccessToken))
                 throw new InvalidOperationException("Google OAuth refresh response did not include an access token.");
@@ -98,6 +131,10 @@ internal sealed class GoogleHealthAuthorizationService(
             connection.UpdatedAtUtc = DateTimeOffset.UtcNow;
 
             await dbContext.SaveChangesAsync(cancellationToken);
+            logger.LogInformation(
+                "Google Health access token refresh succeeded. AccessTokenExpiresAtUtc: {AccessTokenExpiresAtUtc}; RefreshTokenExpiresAtUtc: {RefreshTokenExpiresAtUtc}.",
+                connection.AccessTokenExpiresAtUtc,
+                connection.RefreshTokenExpiresAtUtc);
         }
 
         return _tokenProtector.Unprotect(connection.AccessToken);
@@ -125,20 +162,26 @@ internal sealed class GoogleHealthAuthorizationService(
             .SingleOrDefaultAsync(item => item.UserKey == LocalUser.Key, cancellationToken);
 
         if (connection is null)
+        {
+            logger.LogInformation("Google Health disconnect requested, but no connection exists.");
             return;
+        }
 
+        logger.LogInformation("Google Health disconnect started.");
         var refreshToken = _tokenProtector.Unprotect(connection.RefreshToken);
         try
         {
             await CreateFlow(prompt: null).RevokeTokenAsync(LocalUser.Key, refreshToken, cancellationToken);
+            logger.LogInformation("Google Health remote token revocation succeeded.");
         }
-        catch
+        catch (Exception ex)
         {
-            // Remote revocation is best-effort; local cleanup must still complete.
+            logger.LogWarning(ex, "Google Health remote token revocation failed; local disconnect will continue.");
         }
 
         dbContext.HealthConnections.Remove(connection);
         await dbContext.SaveChangesAsync(cancellationToken);
+        logger.LogInformation("Google Health local connection cleanup completed.");
     }
 
     private GoogleAuthorizationCodeFlow CreateFlow(string? prompt) =>

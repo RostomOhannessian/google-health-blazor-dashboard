@@ -41,11 +41,14 @@ internal sealed class GoogleHealthDailySyncBackgroundService(
             }
             catch (OperationCanceledException)
             {
+                logger.LogInformation("Google Health daily sync background service is stopping.");
                 break;
             }
 
             await RunSyncAsync(stoppingToken);
         }
+
+        logger.LogInformation("Google Health daily sync background service stopped.");
     }
 
     private async Task RunSyncAsync(CancellationToken stoppingToken)

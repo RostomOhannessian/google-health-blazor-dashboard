@@ -30,6 +30,12 @@ public static class ServiceCollectionExtensions
             .Validate(options => options.SyncHourUtc is >= 0 and <= 23, "SyncHourUtc must be between 0 and 23.")
             .Validate(options => options.DaysToSync is >= 1 and <= 90, "DaysToSync must be between 1 and 90.");
 
+        services.AddOptions<GoogleHealthHttpLoggingOptions>()
+            .Bind(configuration.GetSection(GoogleHealthHttpLoggingOptions.SectionName))
+            .Validate(
+                options => options.MaxBodyCharacters is >= 0 and <= 32768,
+                "GoogleHealthHttpLogging MaxBodyCharacters must be between 0 and 32768.");
+
         var connectionString = configuration.GetConnectionString("HealthMetricsDb")
             ?? "Data Source=health-metrics.db";
 

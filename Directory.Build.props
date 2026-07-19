@@ -1,0 +1,10 @@
+<Project>
+  <!--
+    Explicit override for SQLitePCLRaw.lib.e_sqlite3 2.1.11: GHSA-2m69-gcr7-jv3q.
+    Pulled transitively by Microsoft.EntityFrameworkCore.Sqlite 10.0.0 across all projects.
+    Remove when upstream ships a safe version natively.
+  -->
+  <ItemGroup>
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.53.3" />
+  </ItemGroup>
+</Project>

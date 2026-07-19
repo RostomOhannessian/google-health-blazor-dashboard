@@ -1,0 +1,199 @@
+using System.Net;
+using HealthMetrics.Infrastructure.Clients;
+
+namespace HealthMetrics.Tests.Clients;
+
+public sealed class GoogleHealthApiClientTests
+{
+    [Fact]
+    public async Task FetchDailyMetricsAsync_MapsGoogleHealthDailyData()
+    {
+        var handler = new StubHttpMessageHandler(request =>
+        {
+            var path = request.RequestUri!.ToString();
+            if (path.Contains("users/me/settings"))
+                return Json("""{"timeZone":"America/Toronto"}""");
+
+            if (path.Contains("daily-resting-heart-rate"))
+                return Json("""
+                    {
+                      "dataPoints": [
+                        {
+                          "date": { "year": 2026, "month": 7, "day": 18 },
+                          "value": { "dailyRestingHeartRate": { "beatsPerMinute": 58 } }
+                        }
+                      ]
+                    }
+                    """);
+
+            if (path.Contains("daily-heart-rate-variability"))
+                return Json("""
+                    {
+                      "dataPoints": [
+                        {
+                          "date": { "year": 2026, "month": 7, "day": 18 },
+                          "value": { "dailyHeartRateVariability": { "rmssdMilliseconds": 42.5 } }
+                        }
+                      ]
+                    }
+                    """);
+
+            if (path.Contains("run-vo2-max"))
+                return Json("""
+                    {
+                      "dailyRollupDataPoints": [
+                        {
+                          "date": { "year": 2026, "month": 7, "day": 18 },
+                          "value": { "runVo2Max": { "rateAvg": 47.2 } }
+                        }
+                      ]
+                    }
+                    """);
+
+            if (path.Contains("nutrition-log"))
+                return Json("""
+                    {
+                      "dailyRollupDataPoints": [
+                        {
+                          "date": { "year": 2026, "month": 7, "day": 18 },
+                          "value": {
+                            "nutritionLog": {
+                              "energy": { "kcalSum": 2200 },
+                              "totalCarbohydrate": { "gramsSum": 260.5 },
+                              "totalFat": { "gramsSum": 70 },
+                              "nutrients": [
+                                { "nutrient": "PROTEIN", "quantity": { "gramsSum": 120 } }
+                              ]
+                            }
+                          }
+                        }
+                      ]
+                    }
+                    """);
+
+            return Json("""{}""");
+        });
+
+        var client = CreateClient(handler);
+        var snapshots = await client.FetchDailyMetricsAsync("token", new DateOnly(2026, 7, 18), new DateOnly(2026, 7, 18), CancellationToken.None);
+
+        var snapshot = Assert.Single(snapshots);
+        Assert.Equal(new DateOnly(2026, 7, 18), snapshot.MetricDate);
+        Assert.Equal(58, snapshot.RestingHeartRateBpm);
+        Assert.Equal(42.5m, snapshot.HrvRmssdMilliseconds);
+        Assert.Equal(47.2m, snapshot.RunVo2MaxMlKgMin);
+        Assert.Equal(2200, snapshot.ConsumedCaloriesKcal);
+        Assert.Equal(260.5m, snapshot.CarbohydratesGrams);
+        Assert.Equal(70m, snapshot.FatGrams);
+        Assert.Equal(120m, snapshot.ProteinGrams);
+    }
+
+    [Fact]
+    public async Task FetchDailyMetricsAsync_PaginatesListEndpoints()
+    {
+        var restingHeartRateCalls = 0;
+        var handler = new StubHttpMessageHandler(request =>
+        {
+            var path = request.RequestUri!.ToString();
+            if (path.Contains("users/me/settings"))
+                return Json("""{"timeZone":"UTC"}""");
+
+            if (path.Contains("daily-resting-heart-rate"))
+            {
+                restingHeartRateCalls++;
+                return restingHeartRateCalls == 1
+                    ? Json("""
+                        {
+                          "nextPageToken": "page-2",
+                          "dataPoints": [
+                            { "date": { "year": 2026, "month": 7, "day": 18 }, "value": { "bpm": 60 } }
+                          ]
+                        }
+                        """)
+                    : Json("""
+                        {
+                          "dataPoints": [
+                            { "date": { "year": 2026, "month": 7, "day": 19 }, "value": { "bpm": 61 } }
+                          ]
+                        }
+                        """);
+            }
+
+            return Json("""{}""");
+        });
+
+        var client = CreateClient(handler);
+        var snapshots = await client.FetchDailyMetricsAsync("token", new DateOnly(2026, 7, 18), new DateOnly(2026, 7, 19), CancellationToken.None);
+
+        Assert.Equal(2, restingHeartRateCalls);
+        Assert.Equal([60, 61], snapshots.Select(snapshot => snapshot.RestingHeartRateBpm).ToArray());
+        Assert.Contains(handler.Requests, request => request.Uri.Contains("pageToken=page-2"));
+    }
+
+    [Fact]
+    public async Task FetchDailyMetricsAsync_DailyRollupUsesCivilTimeWindow()
+    {
+        var handler = new StubHttpMessageHandler(request =>
+        {
+            if (request.RequestUri!.ToString().Contains("users/me/settings"))
+                return Json("""{"timeZone":"America/Toronto"}""");
+
+            return Json("""{}""");
+        });
+
+        var client = CreateClient(handler);
+        await client.FetchDailyMetricsAsync("token", new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 1), CancellationToken.None);
+
+        var runVo2Request = Assert.Single(handler.Requests, request => request.Uri.Contains("run-vo2-max"));
+        Assert.Contains("\"timeZone\":\"America/Toronto\"", runVo2Request.Body);
+        Assert.Contains("\"windowSizeDays\":1", runVo2Request.Body);
+    }
+
+    [Fact]
+    public async Task FetchDailyMetricsAsync_AuthorizationFailureThrowsGoogleHealthApiException()
+    {
+        var handler = new StubHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.Forbidden)
+        {
+            Content = new StringContent("""{"error":"insufficient_scope"}""")
+        });
+
+        var client = CreateClient(handler);
+        var exception = await Assert.ThrowsAsync<GoogleHealthApiException>(
+            () => client.FetchDailyMetricsAsync("token", new DateOnly(2026, 7, 18), new DateOnly(2026, 7, 18), CancellationToken.None));
+
+        Assert.True(exception.IsAuthorizationFailure);
+    }
+
+    private static GoogleHealthApiClient CreateClient(HttpMessageHandler handler)
+    {
+        var httpClient = new HttpClient(handler)
+        {
+            BaseAddress = new Uri("https://health.googleapis.com/v4/")
+        };
+
+        return new GoogleHealthApiClient(httpClient);
+    }
+
+    private static HttpResponseMessage Json(string json) =>
+        new(HttpStatusCode.OK)
+        {
+            Content = new StringContent(json, System.Text.Encoding.UTF8, "application/json")
+        };
+
+    private sealed record CapturedRequest(HttpMethod Method, string Uri, string Body);
+
+    private sealed class StubHttpMessageHandler(Func<HttpRequestMessage, HttpResponseMessage> responder) : HttpMessageHandler
+    {
+        public List<CapturedRequest> Requests { get; } = [];
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var body = request.Content is null
+                ? string.Empty
+                : await request.Content.ReadAsStringAsync(cancellationToken);
+
+            Requests.Add(new CapturedRequest(request.Method, request.RequestUri!.ToString(), body));
+            return responder(request);
+        }
+    }
+}

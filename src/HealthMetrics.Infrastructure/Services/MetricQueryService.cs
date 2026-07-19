@@ -1,0 +1,38 @@
+using HealthMetrics.Application.Interfaces;
+using HealthMetrics.Application.Models;
+using HealthMetrics.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+
+namespace HealthMetrics.Infrastructure.Services;
+
+internal sealed class MetricQueryService(HealthMetricsDbContext dbContext) : IMetricQueryService
+{
+    public async Task<IReadOnlyList<DailyMetricSnapshot>> GetRecentMetricsAsync(
+        int dayCount,
+        CancellationToken cancellationToken = default)
+    {
+        if (dayCount <= 0 || dayCount > 365)
+        {
+            throw new ArgumentOutOfRangeException(nameof(dayCount), "Day count must be between 1 and 365.");
+        }
+
+        return await dbContext.DailyMetricSnapshots
+            .AsNoTracking()
+            .Where(item => item.UserKey == LocalUser.Key)
+            .OrderByDescending(item => item.MetricDate)
+            .Take(dayCount)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<SyncHistoryEntry>> GetRecentSyncHistoryAsync(
+        int count = 10,
+        CancellationToken cancellationToken = default)
+    {
+        return await dbContext.SyncHistory
+            .AsNoTracking()
+            .Where(entry => entry.UserKey == LocalUser.Key)
+            .OrderByDescending(entry => entry.StartedAtUtc)
+            .Take(count)
+            .ToListAsync(cancellationToken);
+    }
+}

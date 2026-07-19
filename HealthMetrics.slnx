@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/HealthMetrics.Application/HealthMetrics.Application.csproj" />
+    <Project Path="src/HealthMetrics.Infrastructure/HealthMetrics.Infrastructure.csproj" />
+    <Project Path="src/HealthMetrics.Web/HealthMetrics.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/HealthMetrics.Tests/HealthMetrics.Tests.csproj" />
+  </Folder>
+</Solution>

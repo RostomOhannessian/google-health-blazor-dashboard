@@ -1,121 +1,155 @@
-# Fitbit Metrics
+# Health Metrics
 
-A personal health metrics dashboard built with **.NET 10**, **Blazor Server**, and **SQLite**, pulling daily data from the Fitbit Web API. Built as a portfolio piece demonstrating production-style .NET practices, and used personally as a daily health tracker.
+A personal health dashboard built with **.NET 10**, **Blazor Server**, **SQLite**, and the **Google Health API**. It is designed as both a daily-use health tracker and a recruiter-facing portfolio project that demonstrates production-style .NET architecture, OAuth security, API integration, persistence, migrations, resilience, and automated tests.
 
 ## What it does
 
-Connects to Fitbit via **OAuth 2.0 Authorization Code flow**, syncs selected health and nutrition metrics into a local SQLite database, and presents them on an interactive Blazor dashboard. Sync can be triggered manually or run automatically on a schedule.
+- Connects to Google Health with **Google OAuth 2.0 Authorization Code flow** and offline refresh tokens.
+- Syncs daily Google Health records into a local SQLite database.
+- Shows date-range dashboard cards, a heart-rate/HRV trend chart, sync history, and a daily snapshot table.
+- Supports deterministic demo data for portfolio walkthroughs without requiring live Google Health consent.
+- Exports the current metric range as CSV.
+
+## Why Google Health API
+
+The legacy Fitbit Web API is being turned down in 2026. This project is a **direct cutover** to Google Health API rather than a compatibility wrapper around the old Fitbit endpoints. Existing legacy OAuth tokens cannot be transferred to Google OAuth, so users must grant consent again through Google.
 
 ## Architecture
 
 ```mermaid
-graph TD
-    subgraph Browser
-        UI[Blazor Server UI]
-    end
-    subgraph "ASP.NET Core Host"
-        API["Minimal API endpoints\n/api/fitbit/* · /api/metrics"]
-        App["Application layer\nInterfaces + Domain models"]
-        Infra["Infrastructure layer\nOAuth · Sync · EF Core"]
-    end
-    subgraph Data
-        DB[(SQLite\nfitbit-metrics.db)]
-    end
-    FitbitAPI[Fitbit Web API]
-
-    UI -->|"Blazor SignalR"| API
-    API --> App
-    App --> Infra
-    Infra -->|"EF Core + Migrations"| DB
-    Infra -->|"HTTPS + Bearer token"| FitbitAPI
+flowchart TD
+    Browser[Blazor Server UI] --> Host[ASP.NET Core Host]
+    Host --> API[Minimal API endpoints\n/api/health/* · /api/metrics]
+    API --> App[HealthMetrics.Application\nInterfaces + domain models]
+    App --> Infra[HealthMetrics.Infrastructure\nGoogle OAuth · Google Health client · EF Core]
+    Infra --> GoogleOAuth[Google OAuth 2.0]
+    Infra --> GoogleHealth[Google Health API v4]
+    Infra --> DB[(SQLite\nhealth-metrics.db)]
 ```
 
 ## Engineering highlights
 
-Deliberate design choices that reflect production-style thinking:
-
-| Area | Decision | Rationale |
+| Area | Implementation | Why it matters |
 |---|---|---|
-| **Layering** | `Application` holds only interfaces + domain models; `Infrastructure` owns all I/O | Core logic stays dependency-free and independently testable |
-| **OAuth 2.0** | Full Authorization Code flow with per-request state nonce stored in `IMemoryCache` | Demonstrates real-world CSRF protection, not just happy-path auth |
-| **Token refresh** | Proactive refresh with 2-minute expiry buffer | Prevents sync failures mid-operation rather than reacting after a 401 |
-| **Sync idempotency** | Unique `(UserKey, MetricDate)` DB constraint + merge-on-conflict in service layer | Safe to re-run for the same date range without duplicating rows |
-| **Nullable metrics** | All health fields are nullable with partial-availability by design | Reflects real API variability; `null` means "not provided", not "error" |
-| **Options validation** | `FitbitApiOptions` bound with `ValidateOnStart()` | Fails fast at startup rather than on the first user request |
-| **HttpClient** | Typed client registered via `IHttpClientFactory` | Follows Microsoft guidance; avoids socket exhaustion from `new HttpClient()` |
-| **Migrations** | EF Core migrations applied automatically on startup | Zero-friction local setup; schema always in sync with code |
+| **Layering** | `Application` contains provider-neutral interfaces/models; `Infrastructure` owns Google OAuth, REST, EF Core, and resilience | Keeps UI and domain code decoupled from Google response shapes |
+| **OAuth security** | Google Auth library, one-time state nonce, offline consent, encrypted token persistence, best-effort revoke | Demonstrates real OAuth lifecycle work, not only happy-path redirects |
+| **Token storage** | ASP.NET Core Data Protection with a Google-specific purpose string | Tokens are encrypted at rest in SQLite |
+| **API client** | Typed `HttpClient` for `https://health.googleapis.com/v4/` plus transient-failure resilience | Avoids socket exhaustion and keeps HTTP policy centralized |
+| **Daily sync** | Range-based sync, idempotent merge on `(UserKey, MetricDate)`, sync history records | Safe to re-run and transparent when a sync fails |
+| **Data contract** | Active dashboard fields are limited to confirmed Google Health data types | Avoids permanently empty Fitbit-era columns |
+| **Migration safety** | Legacy credentials are removed; useful historical metrics are preserved; retired columns are archived | Direct cutover without silently discarding historical personal data |
+| **Tests** | 30 tests covering persistence, summaries, demo seed, Google Health client fixtures, and endpoints | Recruiter-visible quality signal |
 
-## Tracked metrics
+## Active metric contract
 
-| Metric | Unit | Fitbit endpoint |
+| Dashboard field | Google Health source | Unit |
 |---|---|---|
-| Resting heart rate | bpm | `activities/heart` |
-| HRV – daily RMSSD | ms | `hrv/date/` |
-| VO2 Max / cardio fitness score | ml/kg/min | `cardioscore/date/` |
-| Calories consumed | kcal | `foods/log/date/` |
-| Carbohydrates | g | ↑ nutrition summary |
-| Fat | g | ↑ nutrition summary |
-| Protein | g | ↑ nutrition summary |
-| Fiber | g | ↑ nutrition summary |
-| Sodium | mg | ↑ nutrition summary |
-| Potassium | mg | ↑ nutrition summary |
-| Calcium | mg | ↑ nutrition summary |
-| Iron | mg | ↑ nutrition summary |
+| Resting heart rate | `daily-resting-heart-rate` | bpm |
+| Heart-rate variability | `daily-heart-rate-variability` | RMSSD ms |
+| Run VO2 Max | `run-vo2-max` daily rollup | ml/kg/min |
+| Calories consumed | `nutrition-log` daily rollup energy | kcal |
+| Carbohydrates | `nutrition-log` daily rollup | g |
+| Fat | `nutrition-log` daily rollup | g |
+| Protein | `nutrition-log` nutrient rollup | g |
 
-> HRV, VO2 Max, and some micronutrients depend on device capability and Fitbit account data. Missing fields are stored as `null` and shown as `—` in the dashboard.
+Missing values are normal: Google Health only returns data that exists for the user's device/account and granted scopes.
 
 ## Solution layout
 
-```
+```text
 src/
-  FitbitMetrics.Application/    # Domain models + service interfaces (no I/O)
-  FitbitMetrics.Infrastructure/ # EF Core, Fitbit API client, OAuth and sync services
-  FitbitMetrics.Web/            # Blazor Server UI + minimal API endpoints
+  HealthMetrics.Application/     # Domain models + service interfaces
+  HealthMetrics.Infrastructure/  # Google OAuth, Google Health REST client, EF Core, sync services
+  HealthMetrics.Web/             # Blazor Server UI + minimal API endpoints
 tests/
-  FitbitMetrics.Tests/          # Persistence and integration tests
+  HealthMetrics.Tests/           # Unit, persistence, client, and endpoint tests
+docs/
+  google-health-setup.md         # Google Cloud / OAuth setup
+  google-health-data-contract.md # Source-to-domain mapping and query rules
+  architecture.md                # Design notes and tradeoffs
 ```
 
 ## Local setup
 
 ### Prerequisites
+
 - .NET 10 SDK
-- A Fitbit account and a registered Fitbit app
+- A Google Cloud project with Google Health API enabled
+- A Google OAuth web client configured for the local redirect URI
 
-### 1. Register a Fitbit app
+### 1. Configure Google Cloud
 
-Go to [dev.fitbit.com/apps/new](https://dev.fitbit.com/apps/new) and create an app with:
-- **Application Type**: Personal
-- **OAuth 2.0 Application Type**: Personal
-- **Callback URL**: `https://localhost:5001/api/fitbit/callback`
+Follow [`docs/google-health-setup.md`](docs/google-health-setup.md). At minimum:
 
-### 2. Store credentials (never committed to source)
+- Enable **Google Health API**.
+- Create a **Web application** OAuth client.
+- Add `https://localhost:5001/api/health/callback` as an authorized redirect URI.
+- Add yourself as a test user while the consent screen is in testing mode.
+- Add the required Google Health restricted scopes.
+
+### 2. Store secrets locally
 
 ```powershell
-dotnet user-secrets --project .\src\FitbitMetrics.Web\FitbitMetrics.Web.csproj set "FitbitApi:ClientId" "<your-client-id>"
-dotnet user-secrets --project .\src\FitbitMetrics.Web\FitbitMetrics.Web.csproj set "FitbitApi:ClientSecret" "<your-client-secret>"
-dotnet user-secrets --project .\src\FitbitMetrics.Web\FitbitMetrics.Web.csproj set "FitbitApi:RedirectUri" "https://localhost:5001/api/fitbit/callback"
+dotnet user-secrets --project .\src\HealthMetrics.Web\HealthMetrics.Web.csproj set "GoogleHealthApi:ClientId" "<your-google-client-id>"
+dotnet user-secrets --project .\src\HealthMetrics.Web\HealthMetrics.Web.csproj set "GoogleHealthApi:ClientSecret" "<your-google-client-secret>"
+dotnet user-secrets --project .\src\HealthMetrics.Web\HealthMetrics.Web.csproj set "GoogleHealthApi:RedirectUri" "https://localhost:5001/api/health/callback"
 ```
 
 ### 3. Run
 
 ```powershell
-dotnet run --project .\src\FitbitMetrics.Web\FitbitMetrics.Web.csproj
+dotnet run --project .\src\HealthMetrics.Web\HealthMetrics.Web.csproj
 ```
 
-The database is created and migrated automatically on first run. Navigate to `https://localhost:5001`, click **Connect Fitbit**, then **Sync**.
+The SQLite database is created and migrated automatically. Navigate to `https://localhost:5001`, connect Google Health, then sync a 7/30/90-day range.
 
-## Notes
+### 4. Test
 
-- **Single-user by design**: uses a fixed `demo-user` key; the schema and service layer are structured for future multi-user extension.
-- **No secrets in source**: `appsettings.json` contains only `__SET_VIA_USER_SECRETS__` placeholders. All credentials live in user-secrets or environment variables.
-- **Missing values are expected**: a `—` in the dashboard means Fitbit did not return that field for that day — not a sync error.
+```powershell
+dotnet test .\HealthMetrics.slnx
+```
+
+## Configuration
+
+```json
+{
+  "ConnectionStrings": {
+    "HealthMetricsDb": "Data Source=health-metrics.db"
+  },
+  "GoogleHealthDailySync": {
+    "Enabled": false,
+    "SyncHourUtc": 6,
+    "DaysToSync": 7
+  }
+}
+```
+
+Automatic sync is disabled by default. Enable it only after Google OAuth credentials are configured.
+
+## Security notes
+
+- No client secrets are committed; use user-secrets or environment variables.
+- Access and refresh tokens are encrypted at rest with ASP.NET Core Data Protection.
+- Google OAuth refresh tokens in **Testing** mode can expire quickly; publish the consent screen before relying on long-lived daily sync.
+- Disconnect removes local tokens even if remote revocation fails.
+
+## Migration behavior
+
+The EF migration from the old Fitbit Web API prototype:
+
+- deletes legacy OAuth rows because Fitbit tokens cannot be used with Google OAuth;
+- keeps daily history for fields with a Google Health equivalent;
+- renames VO2 Max history into the run VO2 Max column;
+- archives retired nutrition/micronutrient fields into `archived_legacy_metric_fields`.
+
+## Documentation
+
+- [Google Health setup](docs/google-health-setup.md)
+- [Google Health data contract](docs/google-health-data-contract.md)
+- [Architecture notes](docs/architecture.md)
 
 ## Roadmap
 
-- [ ] Summary cards with 7-day averages and trend direction indicators
-- [ ] Line/sparkline charts for heart rate and HRV over time
-- [ ] Daily scheduled auto-sync via hosted background service
-- [ ] CSV export for custom date ranges
-- [ ] OAuth token encryption at rest (ASP.NET Core Data Protection)
-- [ ] Disconnect / token revoke flow
-- [ ] Expanded test coverage: mapper edge cases, endpoint integration tests
+- Add screenshots/GIFs after the first live Google Health sync.
+- Add webhook subscriptions once Google Health access approval is complete.
+- Add user-configurable dashboard thresholds for recovery and training trends.

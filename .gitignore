@@ -24,11 +24,18 @@ TestResults/
 *.log
 
 # Local SQLite runtime files
-fitbit-metrics.db
-fitbit-metrics.db-shm
-fitbit-metrics.db-wal
+health-metrics.db
+health-metrics.db-shm
+health-metrics.db-wal
+health-metrics.dev.db
+health-metrics.dev.db-shm
+health-metrics.dev.db-wal
 
 # Local secrets and environment files
 .env
 .env.*
 appsettings.Local.json
+
+# Copilot session artifacts
+plan.md
+checkpoints/

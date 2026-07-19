@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/FitbitMetrics.Application/FitbitMetrics.Application.csproj" />
+    <Project Path="src/FitbitMetrics.Infrastructure/FitbitMetrics.Infrastructure.csproj" />
+    <Project Path="src/FitbitMetrics.Web/FitbitMetrics.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/FitbitMetrics.Tests/FitbitMetrics.Tests.csproj" />
+  </Folder>
+</Solution>

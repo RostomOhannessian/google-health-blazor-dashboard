@@ -56,6 +56,12 @@ public static class ServiceCollectionExtensions
             resilience.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(90);
         });
 
+        services.AddHttpClient<GoogleAccountApiClient>(client =>
+        {
+            client.BaseAddress = new Uri("https://openidconnect.googleapis.com/");
+            client.Timeout = TimeSpan.FromSeconds(30);
+        });
+
         services.AddScoped<IHealthAuthorizationService, GoogleHealthAuthorizationService>();
         services.AddScoped<IHealthSyncService, GoogleHealthSyncService>();
         services.AddScoped<IMetricQueryService, MetricQueryService>();

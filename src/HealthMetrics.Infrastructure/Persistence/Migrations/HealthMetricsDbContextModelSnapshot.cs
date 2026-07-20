@@ -90,6 +90,10 @@ namespace HealthMetrics.Infrastructure.Persistence.Migrations
                         .HasMaxLength(160)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("GoogleEmail")
+                        .HasMaxLength(320)
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTimeOffset?>("LastSuccessfulSyncAtUtc")
                         .HasColumnType("TEXT");
 

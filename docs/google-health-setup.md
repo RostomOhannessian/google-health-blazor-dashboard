@@ -130,9 +130,11 @@ access-blocked or unverified-app message.
 
 ### Data Access
 
-Open **Data Access** and add exactly these four scopes:
+Open **Data Access** and add exactly these six scopes:
 
 ```text
+openid
+email
 https://www.googleapis.com/auth/googlehealth.settings.readonly
 https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly
 https://www.googleapis.com/auth/googlehealth.activity_and_fitness.readonly
@@ -141,6 +143,8 @@ https://www.googleapis.com/auth/googlehealth.nutrition.readonly
 
 Why each is present:
 
+* `openid` and `email` identify the connected Google account for the local
+  connection status card.
 * `googlehealth.settings.readonly` reads the user's Google Health time zone,
   which is needed to request daily rollups in the correct civil-time window.
 * `googlehealth.health_metrics_and_measurements.readonly` covers measurements

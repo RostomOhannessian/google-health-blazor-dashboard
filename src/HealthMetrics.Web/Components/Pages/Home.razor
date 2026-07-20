@@ -55,7 +55,11 @@
                 @if (connectionStatus?.IsConnected == true)
                 {
                     <p class="card-text fw-semibold text-success mb-0">Connected ✓</p>
-                    @if (!string.IsNullOrWhiteSpace(connectionStatus.GoogleUserId))
+                    @if (!string.IsNullOrWhiteSpace(connectionStatus.GoogleEmail))
+                    {
+                        <small class="text-muted d-block">Google account @connectionStatus.GoogleEmail</small>
+                    }
+                    else if (!string.IsNullOrWhiteSpace(connectionStatus.GoogleUserId))
                     {
                         <small class="text-muted d-block">Google user @connectionStatus.GoogleUserId</small>
                     }

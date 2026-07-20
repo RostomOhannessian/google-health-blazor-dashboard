@@ -16,6 +16,7 @@ namespace HealthMetrics.Infrastructure.Services;
 internal sealed class GoogleHealthAuthorizationService(
     HealthMetricsDbContext dbContext,
     GoogleHealthApiClient googleHealthApiClient,
+    GoogleAccountApiClient googleAccountApiClient,
     IOptions<GoogleHealthApiOptions> options,
     IDataProtectionProvider dataProtectionProvider,
     ILogger<GoogleHealthAuthorizationService> logger) : IHealthAuthorizationService
@@ -55,6 +56,7 @@ internal sealed class GoogleHealthAuthorizationService(
 
         logger.LogInformation("Google Health authorization code exchange succeeded.");
         var googleUserId = await googleHealthApiClient.GetIdentityAsync(token.AccessToken, cancellationToken);
+        var googleEmail = await googleAccountApiClient.GetEmailAsync(token.AccessToken, cancellationToken);
         var connection = await dbContext.HealthConnections
             .SingleOrDefaultAsync(item => item.UserKey == LocalUser.Key, cancellationToken);
         var isNewConnection = connection is null;
@@ -65,6 +67,7 @@ internal sealed class GoogleHealthAuthorizationService(
             {
                 UserKey = LocalUser.Key,
                 GoogleUserId = googleUserId,
+                GoogleEmail = googleEmail,
                 AccessToken = _tokenProtector.Protect(token.AccessToken),
                 RefreshToken = _tokenProtector.Protect(token.RefreshToken),
                 Scope = NormalizeScope(token.Scope),
@@ -79,6 +82,7 @@ internal sealed class GoogleHealthAuthorizationService(
         else
         {
             connection.GoogleUserId = googleUserId;
+            connection.GoogleEmail = googleEmail;
             connection.AccessToken = _tokenProtector.Protect(token.AccessToken);
             connection.RefreshToken = _tokenProtector.Protect(token.RefreshToken);
             connection.Scope = NormalizeScope(token.Scope);
@@ -147,10 +151,11 @@ internal sealed class GoogleHealthAuthorizationService(
             .SingleOrDefaultAsync(item => item.UserKey == LocalUser.Key, cancellationToken);
 
         return connection is null
-            ? new HealthConnectionStatus(false, null, null, null, null)
+            ? new HealthConnectionStatus(false, null, null, null, null, null)
             : new HealthConnectionStatus(
                 true,
                 connection.GoogleUserId,
+                connection.GoogleEmail,
                 connection.AccessTokenExpiresAtUtc,
                 connection.RefreshTokenExpiresAtUtc,
                 connection.LastSuccessfulSyncAtUtc);

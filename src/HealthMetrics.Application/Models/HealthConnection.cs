@@ -8,6 +8,8 @@ public sealed class HealthConnection
 
     public required string GoogleUserId { get; set; }
 
+    public string? GoogleEmail { get; set; }
+
     public required string AccessToken { get; set; }
 
     public required string RefreshToken { get; set; }

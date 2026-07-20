@@ -25,6 +25,24 @@ public sealed class GoogleHealthApiClientTests
     }
 
     [Fact]
+    public async Task GetAccountEmailAsync_ReturnsGoogleAccountEmail()
+    {
+        var handler = new StubHttpMessageHandler(_ => Json("""{"email":"user@example.com"}"""));
+        var httpClient = new HttpClient(handler)
+        {
+            BaseAddress = new Uri("https://openidconnect.googleapis.com/")
+        };
+        var client = new GoogleAccountApiClient(httpClient);
+
+        var email = await client.GetEmailAsync("token", CancellationToken.None);
+
+        Assert.Equal("user@example.com", email);
+        var request = Assert.Single(handler.Requests);
+        Assert.Equal(HttpMethod.Get, request.Method);
+        Assert.Contains("v1/userinfo", request.Uri);
+    }
+
+    [Fact]
     public async Task FetchDailyMetricsAsync_MapsGoogleHealthDailyData()
     {
         var handler = new StubHttpMessageHandler(request =>

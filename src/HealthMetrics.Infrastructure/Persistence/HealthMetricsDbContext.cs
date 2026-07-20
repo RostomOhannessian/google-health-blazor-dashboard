@@ -20,6 +20,7 @@ public sealed class HealthMetricsDbContext(DbContextOptions<HealthMetricsDbConte
             entity.HasIndex(connection => connection.UserKey).IsUnique();
             entity.Property(connection => connection.UserKey).HasMaxLength(120).IsRequired();
             entity.Property(connection => connection.GoogleUserId).HasMaxLength(160).IsRequired();
+            entity.Property(connection => connection.GoogleEmail).HasMaxLength(320);
             entity.Property(connection => connection.AccessToken).HasMaxLength(4000).IsRequired();
             entity.Property(connection => connection.RefreshToken).HasMaxLength(4000).IsRequired();
             entity.Property(connection => connection.Scope).HasMaxLength(1200).IsRequired();

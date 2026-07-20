@@ -130,7 +130,8 @@ internal sealed class GoogleHealthApiClient(
         Action<DailyMetricSnapshot, JsonElement> apply,
         CancellationToken cancellationToken)
     {
-        var filter = $"{filterPrefix}.date >= \"{startDate:yyyy-MM-dd}\" AND {filterPrefix}.date <= \"{endDate:yyyy-MM-dd}\"";
+        var exclusiveEndDate = endDate.AddDays(1);
+        var filter = $"{filterPrefix}.date >= \"{startDate:yyyy-MM-dd}\" AND {filterPrefix}.date < \"{exclusiveEndDate:yyyy-MM-dd}\"";
         var pageToken = string.Empty;
         var pageCount = 0;
         var pointCount = 0;

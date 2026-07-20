@@ -108,6 +108,24 @@ public sealed class GoogleHealthApiClientTests
     }
 
     [Fact]
+    public async Task FetchDailyMetricsAsync_ListFiltersUseExclusiveEndDate()
+    {
+        var handler = new StubHttpMessageHandler(request =>
+            request.RequestUri!.ToString().Contains("users/me/settings")
+                ? Json("""{"timeZone":"UTC"}""")
+                : Json("""{}"""));
+        var client = CreateClient(handler);
+
+        await client.FetchDailyMetricsAsync("token", new DateOnly(2026, 7, 18), new DateOnly(2026, 7, 18), CancellationToken.None);
+
+        var request = Assert.Single(handler.Requests, request => request.Uri.Contains("daily-resting-heart-rate"));
+        var filter = Uri.UnescapeDataString(request.Uri);
+        Assert.Contains("daily_resting_heart_rate.date >= \"2026-07-18\"", filter);
+        Assert.Contains("daily_resting_heart_rate.date < \"2026-07-19\"", filter);
+        Assert.DoesNotContain("<=", filter);
+    }
+
+    [Fact]
     public async Task FetchDailyMetricsAsync_PaginatesListEndpoints()
     {
         var restingHeartRateCalls = 0;

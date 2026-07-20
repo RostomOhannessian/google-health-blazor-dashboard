@@ -465,7 +465,8 @@ internal sealed class GoogleHealthApiClient(
     {
         if (TryReadDateObject(element, "date", out date)
             || TryReadDateObject(element, "startDate", out date)
-            || TryReadDateObject(element, "civilStartDate", out date))
+            || TryReadDateObject(element, "civilStartDate", out date)
+            || TryReadDateObject(element, "civilDate", out date))
             return true;
 
         if (TryReadDateFromNested(element, out date))
@@ -480,16 +481,32 @@ internal sealed class GoogleHealthApiClient(
     private static bool TryReadDateObject(JsonElement element, string propertyName, out DateOnly date)
     {
         date = default;
-        if (!element.TryGetProperty(propertyName, out var dateElement) || dateElement.ValueKind is not JsonValueKind.Object)
+        if (element.ValueKind is not JsonValueKind.Object
+            || !element.TryGetProperty(propertyName, out var dateElement))
             return false;
 
-        if (!TryReadIntProperty(dateElement, "year", out var year)
+        if (dateElement.ValueKind is JsonValueKind.String)
+        {
+            return DateOnly.TryParseExact(
+                dateElement.GetString(),
+                "yyyy-MM-dd",
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out date);
+        }
+
+        if (dateElement.ValueKind is not JsonValueKind.Object
+            || !TryReadIntProperty(dateElement, "year", out var year)
             || !TryReadIntProperty(dateElement, "month", out var month)
             || !TryReadIntProperty(dateElement, "day", out var day))
             return false;
 
-        date = new DateOnly(year, month, day);
-        return true;
+        return DateOnly.TryParseExact(
+            $"{year:D4}-{month:D2}-{day:D2}",
+            "yyyy-MM-dd",
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.None,
+            out date);
     }
 
     private static bool TryReadDateFromNested(JsonElement element, out DateOnly date)
@@ -519,7 +536,8 @@ internal sealed class GoogleHealthApiClient(
     private static bool TryReadIntProperty(JsonElement element, string propertyName, out int value)
     {
         value = default;
-        return element.TryGetProperty(propertyName, out var property)
+        return element.ValueKind is JsonValueKind.Object
+            && element.TryGetProperty(propertyName, out var property)
             && property.ValueKind is JsonValueKind.Number
             && property.TryGetInt32(out value);
     }

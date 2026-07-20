@@ -41,7 +41,7 @@ The migration archives those retired fields in `archived_legacy_metric_fields` b
 - `nextPageToken`
 - the canonical `healthUserId` returned by `users/me/identity`
 - nested union-style `value` payloads
-- civil date objects
+- `YYYY-MM-DD` dates and civil date objects
 - numeric strings or JSON numbers
 - API failures with sanitized error messages
 

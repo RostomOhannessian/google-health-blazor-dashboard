@@ -21,14 +21,22 @@
 <div class="d-flex flex-wrap gap-2 mb-4">
     @if (connectionStatus?.IsConnected != true)
     {
-        <a class="btn btn-primary" href="/api/health/connect">Connect Google Health</a>
+        <a class="btn btn-primary google-health-connect" href="/api/health/connect" data-google-health-connect>
+            <span>Connect Google Health</span>
+            <span class="spinner-border spinner-border-sm google-health-connect-spinner" aria-hidden="true"></span>
+            <span class="google-health-connect-status" role="status">Opening Google Health...</span>
+        </a>
     }
     else
     {
         <button class="btn btn-primary" type="button" @onclick="SyncNowAsync" disabled="@isSyncing">
             @(isSyncing ? "Syncing…" : $"Sync last {selectedDays} days")
         </button>
-        <a class="btn btn-outline-secondary btn-sm align-self-center" href="/api/health/connect">Reconnect</a>
+        <a class="btn btn-outline-secondary btn-sm align-self-center google-health-connect" href="/api/health/connect" data-google-health-connect>
+            <span>Reconnect</span>
+            <span class="spinner-border spinner-border-sm google-health-connect-spinner" aria-hidden="true"></span>
+            <span class="google-health-connect-status" role="status">Opening Google Health...</span>
+        </a>
         <button class="btn btn-outline-danger btn-sm align-self-center" type="button" @onclick="DisconnectAsync">Disconnect</button>
     }
     <button class="btn btn-outline-secondary" type="button" @onclick="LoadDataAsync">Refresh</button>

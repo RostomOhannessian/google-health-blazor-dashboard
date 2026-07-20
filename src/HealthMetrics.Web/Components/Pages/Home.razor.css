@@ -1,0 +1,19 @@
+.google-health-connect {
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.google-health-connect-spinner,
+.google-health-connect-status {
+    display: none;
+}
+
+.google-health-connect.is-pending {
+    cursor: wait;
+    pointer-events: none;
+}
+
+.google-health-connect.is-pending .google-health-connect-spinner,
+.google-health-connect.is-pending .google-health-connect-status {
+    display: inline-block;
+}

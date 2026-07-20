@@ -95,6 +95,20 @@ public sealed class HealthEndpointTests
         Assert.Contains(".page[", await stylesheet.Content.ReadAsStringAsync());
     }
 
+    [Fact]
+    public async Task RootDocument_ReferencesGoogleHealthConnectFeedbackScript()
+    {
+        await using var factory = new HealthMetricsWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var root = await client.GetAsync("/");
+        var script = await client.GetAsync("/health-connect.js");
+
+        Assert.Equal(HttpStatusCode.OK, root.StatusCode);
+        Assert.Contains("health-connect.js", await root.Content.ReadAsStringAsync());
+        Assert.Equal(HttpStatusCode.OK, script.StatusCode);
+    }
+
     private sealed class HealthMetricsWebApplicationFactory : WebApplicationFactory<Program>
     {
         private readonly bool useRealAuthorization;

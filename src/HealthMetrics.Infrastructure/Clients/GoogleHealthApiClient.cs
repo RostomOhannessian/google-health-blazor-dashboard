@@ -34,12 +34,6 @@ internal sealed class GoogleHealthApiClient(
             ?? throw new InvalidOperationException("Google Health identity response did not include a user id.");
     }
 
-    public async Task<string> GetUserTimeZoneAsync(string accessToken, CancellationToken cancellationToken)
-    {
-        using var doc = await SendJsonAsync(HttpMethod.Get, "users/me/settings", accessToken, null, cancellationToken);
-        return FindString(doc.RootElement, "timeZone", "time_zone", "timezone") ?? "UTC";
-    }
-
     public async Task<IReadOnlyList<DailyMetricSnapshot>> FetchDailyMetricsAsync(
         string accessToken,
         DateOnly startDate,
@@ -64,8 +58,6 @@ internal sealed class GoogleHealthApiClient(
                 };
             })
             .ToDictionary(snapshot => snapshot.MetricDate);
-
-        var timeZone = await GetUserTimeZoneAsync(accessToken, cancellationToken);
 
         await MergeDailyListAsync(
             snapshots,
@@ -92,7 +84,6 @@ internal sealed class GoogleHealthApiClient(
             "run-vo2-max",
             startDate,
             endDate,
-            timeZone,
             accessToken,
             (snapshot, point) => snapshot.RunVo2MaxMlKgMin = ReadDecimal(point, "rateAvg", "vo2Max", "score"),
             cancellationToken);
@@ -102,7 +93,6 @@ internal sealed class GoogleHealthApiClient(
             "nutrition-log",
             startDate,
             endDate,
-            timeZone,
             accessToken,
             ApplyNutrition,
             cancellationToken);
@@ -175,7 +165,6 @@ internal sealed class GoogleHealthApiClient(
         string dataType,
         DateOnly startDate,
         DateOnly endDate,
-        string timeZone,
         string accessToken,
         Action<DailyMetricSnapshot, JsonElement> apply,
         CancellationToken cancellationToken)
@@ -199,11 +188,10 @@ internal sealed class GoogleHealthApiClient(
 
             var body = new
             {
-                civilTimeInterval = new
+                range = new
                 {
-                    startDate = ToDateObject(chunkStart),
-                    endDate = ToDateObject(chunkEnd.AddDays(1)),
-                    timeZone
+                    start = new { date = ToDateObject(chunkStart) },
+                    end = new { date = ToDateObject(chunkEnd.AddDays(1)) }
                 },
                 windowSizeDays = 1
             };

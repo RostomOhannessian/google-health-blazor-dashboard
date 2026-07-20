@@ -17,7 +17,7 @@ The dashboard intentionally exposes only fields with a Google Health API source 
 ## Date and range behavior
 
 - The app syncs 1-90 days at a time.
-- Google Health daily rollups are requested with a civil-time window and the user's Google Health time zone.
+- Google Health daily rollups use closed-open civil-date ranges aligned to the requested days.
 - Rollup requests are chunked in 14-day windows to stay inside stricter Google Health range limits for affected data types.
 - Missing data points are represented as `null`, not as `0`.
 

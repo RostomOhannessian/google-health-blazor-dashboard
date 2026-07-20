@@ -218,22 +218,18 @@ public sealed class GoogleHealthApiClientTests
     }
 
     [Fact]
-    public async Task FetchDailyMetricsAsync_DailyRollupUsesCivilTimeWindow()
+    public async Task FetchDailyMetricsAsync_DailyRollupUsesClosedOpenCivilDateRange()
     {
-        var handler = new StubHttpMessageHandler(request =>
-        {
-            if (request.RequestUri!.ToString().Contains("users/me/settings"))
-                return Json("""{"timeZone":"America/Toronto"}""");
-
-            return Json("""{}""");
-        });
+        var handler = new StubHttpMessageHandler(_ => Json("""{}"""));
 
         var client = CreateClient(handler);
         await client.FetchDailyMetricsAsync("token", new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 1), CancellationToken.None);
 
         var runVo2Request = Assert.Single(handler.Requests, request => request.Uri.Contains("run-vo2-max"));
-        Assert.Contains("\"timeZone\":\"America/Toronto\"", runVo2Request.Body);
+        Assert.Contains("\"range\":{\"start\":{\"date\":{\"year\":2026,\"month\":7,\"day\":1}},\"end\":{\"date\":{\"year\":2026,\"month\":7,\"day\":2}}}", runVo2Request.Body);
         Assert.Contains("\"windowSizeDays\":1", runVo2Request.Body);
+        Assert.DoesNotContain("civilTimeInterval", runVo2Request.Body);
+        Assert.DoesNotContain("timeZone", runVo2Request.Body);
     }
 
     [Fact]

@@ -8,6 +8,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Configuration;
 
 namespace HealthMetrics.Tests.Web;
 
@@ -29,14 +30,19 @@ public sealed class HealthEndpointTests
     [Fact]
     public async Task Connect_RedirectsToGoogleAuthorizationUri()
     {
-        await using var factory = new HealthMetricsWebApplicationFactory();
+        await using var factory = new HealthMetricsWebApplicationFactory(useRealAuthorization: true);
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
         var response = await client.GetAsync("/api/health/connect");
 
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
-        Assert.StartsWith("https://accounts.google.com/o/oauth2/v2/auth", response.Headers.Location!.ToString());
-        Assert.Contains("state=", response.Headers.Location!.Query);
+        var location = response.Headers.Location!.ToString();
+        Assert.StartsWith("https://accounts.google.com/o/oauth2/v2/auth", location);
+        Assert.Contains("state=", response.Headers.Location.Query);
+        Assert.Contains("redirect_uri=https%3A%2F%2Flocalhost%3A5001%2Fapi%2Fhealth%2Fcallback", location);
+        Assert.Contains("scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fgooglehealth.health_metrics_and_measurements.readonly", location);
+        Assert.Contains("googlehealth.activity_and_fitness.readonly", location);
+        Assert.Contains("googlehealth.nutrition.readonly", location);
     }
 
     [Fact]
@@ -67,11 +73,49 @@ public sealed class HealthEndpointTests
         Assert.DoesNotContain("Fiber", csv);
     }
 
+    [Fact]
+    public async Task RootDocument_ReferencesResolvableScopedStylesheet()
+    {
+        await using var factory = new HealthMetricsWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var response = await client.GetAsync("/");
+        var html = await response.Content.ReadAsStringAsync();
+        var match = System.Text.RegularExpressions.Regex.Match(
+            html,
+            "href=\"(?<href>[^\"]*\\.styles\\.css)\"");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.True(match.Success, "The root document did not reference the generated scoped stylesheet.");
+
+        var stylesheet = await client.GetAsync(match.Groups["href"].Value);
+
+        Assert.Equal(HttpStatusCode.OK, stylesheet.StatusCode);
+        Assert.Contains(".page[", await stylesheet.Content.ReadAsStringAsync());
+    }
+
     private sealed class HealthMetricsWebApplicationFactory : WebApplicationFactory<Program>
     {
+        private readonly bool useRealAuthorization;
+
+        public HealthMetricsWebApplicationFactory(bool useRealAuthorization = false) =>
+            this.useRealAuthorization = useRealAuthorization;
+
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
-            builder.UseEnvironment("Testing");
+            builder.UseEnvironment("Development");
+            builder.ConfigureAppConfiguration((_, configuration) =>
+            {
+                configuration.AddInMemoryCollection(
+                [
+                    new KeyValuePair<string, string?>("GoogleHealthApi:ClientId", "health-metrics-test-client"),
+                    new KeyValuePair<string, string?>("GoogleHealthApi:ClientSecret", "health-metrics-test-secret"),
+                    new KeyValuePair<string, string?>("GoogleHealthApi:RedirectUri", "https://localhost:5001/api/health/callback"),
+                    new KeyValuePair<string, string?>("GoogleHealthApi:Scopes:0", "https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly"),
+                    new KeyValuePair<string, string?>("GoogleHealthApi:Scopes:1", "https://www.googleapis.com/auth/googlehealth.activity_and_fitness.readonly"),
+                    new KeyValuePair<string, string?>("GoogleHealthApi:Scopes:2", "https://www.googleapis.com/auth/googlehealth.nutrition.readonly")
+                ]);
+            });
             builder.ConfigureServices(services =>
             {
                 services.RemoveAll<DbContextOptions<HealthMetricsDbContext>>();
@@ -84,12 +128,15 @@ public sealed class HealthEndpointTests
                 services.AddDbContext<HealthMetricsDbContext>((sp, options) =>
                     options.UseSqlite(sp.GetRequiredService<SqliteConnection>()));
 
-                services.RemoveAll<IHealthAuthorizationService>();
                 services.RemoveAll<IHealthSyncService>();
                 services.RemoveAll<IMetricQueryService>();
                 services.RemoveAll<IDemoSeedService>();
 
-                services.AddSingleton<IHealthAuthorizationService, FakeHealthAuthorizationService>();
+                if (!useRealAuthorization)
+                {
+                    services.RemoveAll<IHealthAuthorizationService>();
+                    services.AddSingleton<IHealthAuthorizationService, FakeHealthAuthorizationService>();
+                }
                 services.AddSingleton<IHealthSyncService, FakeHealthSyncService>();
                 services.AddSingleton<IMetricQueryService, FakeMetricQueryService>();
                 services.AddSingleton<IDemoSeedService, FakeDemoSeedService>();
@@ -100,7 +147,14 @@ public sealed class HealthEndpointTests
     private sealed class FakeHealthAuthorizationService : IHealthAuthorizationService
     {
         public Task<Uri> BuildAuthorizationUriAsync(string state, CancellationToken cancellationToken = default) =>
-            Task.FromResult(new Uri($"https://accounts.google.com/o/oauth2/v2/auth?state={state}&access_type=offline"));
+            Task.FromResult(new Uri(
+                "https://accounts.google.com/o/oauth2/v2/auth" +
+                "?state=" + state +
+                "&access_type=offline" +
+                "&redirect_uri=https%3A%2F%2Flocalhost%3A5001%2Fapi%2Fhealth%2Fcallback" +
+                "&scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fgooglehealth.health_metrics_and_measurements.readonly%20" +
+                "https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fgooglehealth.activity_and_fitness.readonly%20" +
+                "https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fgooglehealth.nutrition.readonly"));
 
         public Task HandleAuthorizationCodeAsync(string code, CancellationToken cancellationToken = default) => Task.CompletedTask;
 

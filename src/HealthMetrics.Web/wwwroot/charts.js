@@ -1,6 +1,45 @@
 window.HealthCharts = (function () {
     const charts = {};
 
+    function themeColors() {
+        const style = getComputedStyle(document.documentElement);
+        return {
+            text: style.getPropertyValue("--bs-body-color").trim(),
+            muted: style.getPropertyValue("--bs-secondary-color").trim(),
+            grid: style.getPropertyValue("--bs-border-color").trim(),
+            tooltipBackground: style.getPropertyValue("--bs-tertiary-bg").trim()
+        };
+    }
+
+    function applyTheme(chart) {
+        const colors = themeColors();
+        chart.options.plugins.legend.labels.color = colors.text;
+        chart.options.plugins.tooltip.titleColor = colors.text;
+        chart.options.plugins.tooltip.bodyColor = colors.text;
+        chart.options.plugins.tooltip.backgroundColor = colors.tooltipBackground;
+        chart.options.plugins.tooltip.borderColor = colors.grid;
+        chart.options.plugins.tooltip.borderWidth = 1;
+
+        Object.values(chart.options.scales ?? {}).forEach(scale => {
+            if (!scale) return;
+
+            scale.title ??= {};
+            scale.ticks ??= {};
+            scale.grid ??= {};
+            scale.border ??= {};
+            scale.title.color = colors.muted;
+            scale.ticks.color = colors.muted;
+            scale.grid.color = colors.grid;
+            scale.border.color = colors.grid;
+        });
+
+        chart.update();
+    }
+
+    window.addEventListener("healthmetrics:themechange", () => {
+        Object.values(charts).forEach(applyTheme);
+    });
+
     return {
         render(canvasId, labels, heartRateData, hrvData) {
             if (charts[canvasId]) {
@@ -9,57 +48,80 @@ window.HealthCharts = (function () {
             const canvas = document.getElementById(canvasId);
             if (!canvas) return;
 
-            const hasHr  = heartRateData.some(v => v !== null);
+            const hasHr = heartRateData.some(v => v !== null);
             const hasHrv = hrvData.some(v => v !== null);
-
             const datasets = [];
+
             if (hasHr) {
                 datasets.push({
-                    label: 'Resting HR (bpm)',
+                    label: "Resting HR (bpm)",
                     data: heartRateData,
-                    borderColor: 'rgb(220, 53, 69)',
-                    backgroundColor: 'rgba(220, 53, 69, 0.08)',
+                    borderColor: "rgb(220, 53, 69)",
+                    backgroundColor: "rgba(220, 53, 69, 0.08)",
                     tension: 0.3,
                     spanGaps: true,
-                    yAxisID: 'yHr'
+                    yAxisID: "yHr"
                 });
             }
+
             if (hasHrv) {
                 datasets.push({
-                    label: 'HRV RMSSD (ms)',
+                    label: "HRV RMSSD (ms)",
                     data: hrvData,
-                    borderColor: 'rgb(13, 110, 253)',
-                    backgroundColor: 'rgba(13, 110, 253, 0.08)',
+                    borderColor: "rgb(13, 110, 253)",
+                    backgroundColor: "rgba(13, 110, 253, 0.08)",
                     tension: 0.3,
                     spanGaps: true,
-                    yAxisID: 'yHrv'
+                    yAxisID: "yHrv"
                 });
             }
 
-            const scales = {};
+            const colors = themeColors();
+            const scales = {
+                x: {
+                    title: { display: false, color: colors.muted },
+                    ticks: { color: colors.muted },
+                    grid: { color: colors.grid },
+                    border: { color: colors.grid }
+                }
+            };
             if (hasHr) {
                 scales.yHr = {
-                    type: 'linear',
-                    position: 'left',
-                    title: { display: true, text: 'HR (bpm)' }
+                    type: "linear",
+                    position: "left",
+                    title: { display: true, text: "HR (bpm)", color: colors.muted },
+                    ticks: { color: colors.muted },
+                    grid: { color: colors.grid },
+                    border: { color: colors.grid }
                 };
             }
             if (hasHrv) {
                 scales.yHrv = {
-                    type: 'linear',
-                    position: 'right',
-                    title: { display: true, text: 'HRV RMSSD (ms)' },
-                    grid: { drawOnChartArea: !hasHr }
+                    type: "linear",
+                    position: "right",
+                    title: { display: true, text: "HRV RMSSD (ms)", color: colors.muted },
+                    ticks: { color: colors.muted },
+                    grid: { drawOnChartArea: !hasHr, color: colors.grid },
+                    border: { color: colors.grid }
                 };
             }
 
             charts[canvasId] = new Chart(canvas, {
-                type: 'line',
+                type: "line",
                 data: { labels, datasets },
                 options: {
                     responsive: true,
-                    interaction: { mode: 'index', intersect: false },
-                    plugins: { legend: { position: 'top' } },
+                    interaction: { mode: "index", intersect: false },
+                    plugins: {
+                        legend: { position: "top", labels: { color: colors.text } },
+                        tooltip: {
+                            titleColor: colors.text,
+                            bodyColor: colors.text,
+                            backgroundColor: colors.tooltipBackground,
+                            borderColor: colors.grid,
+                            borderWidth: 1
+                        }
+                    },
                     scales
                 }
             });

@@ -38,7 +38,7 @@ HealthMetrics.Tests
 The app uses `Microsoft.Extensions.Logging` throughout application services and Serilog at the ASP.NET Core host boundary.
 
 - Console logs are optimized for local development.
-- Rolling JSON file logs are written under `logs\health-metrics-.log` for daily-use troubleshooting.
+- Rolling JSON file logs are written under `logs/health-metrics-.log` for daily-use troubleshooting.
 - API request logging is enabled for minimal API endpoints while static asset noise is kept at debug level.
 - Google Health outbound HTTP calls log method, sanitized path, operation, data type, status code, elapsed time, content length, and data point count.
 - Google Health request bodies are logged for rollup requests because they contain operational parameters like date range, time zone, and window size.

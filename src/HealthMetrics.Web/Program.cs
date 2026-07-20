@@ -17,7 +17,7 @@ Log.Logger = new LoggerConfiguration()
 try
 {
     var builder = WebApplication.CreateBuilder(args);
-    builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
+    ConfigurationSetup.AddLocalConfiguration(builder.Configuration);
     builder.Host.UseSerilog((context, services, loggerConfiguration) => loggerConfiguration
         .ReadFrom.Configuration(context.Configuration)
         .ReadFrom.Services(services)

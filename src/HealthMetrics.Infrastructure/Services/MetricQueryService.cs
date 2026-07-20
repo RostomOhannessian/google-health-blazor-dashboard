@@ -31,7 +31,10 @@ internal sealed class MetricQueryService(HealthMetricsDbContext dbContext) : IMe
         return await dbContext.SyncHistory
             .AsNoTracking()
             .Where(entry => entry.UserKey == LocalUser.Key)
-            .OrderByDescending(entry => entry.StartedAtUtc)
+            // SQLite cannot translate ordering by DateTimeOffset reliably. Sync history
+            // receives its identity when a sync starts, so descending identity is the
+            // database-safe equivalent of newest-first ordering.
+            .OrderByDescending(entry => entry.Id)
             .Take(count)
             .ToListAsync(cancellationToken);
     }

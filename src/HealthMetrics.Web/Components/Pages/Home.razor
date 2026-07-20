@@ -103,7 +103,7 @@
             <div class="card-body">
                 <h6 class="card-subtitle text-muted mb-1">HRV RMSSD</h6>
                 <p class="card-text fw-semibold mb-0">
-                    @SummaryText(summary?.LatestHrvRmssd, summary?.AvgHrvRmssd7d, "ms")
+                    @SummaryText(summary?.LatestHrvRmssd, summary?.AvgHrvRmssd7d, "ms", "F3")
                     <span class="@TrendClass(summary?.HrvTrend)">@TrendIcon(summary?.HrvTrend)</span>
                 </p>
             </div>
@@ -160,12 +160,12 @@
                     <tr>
                         <td>@metric.MetricDate.ToString("MMM d")</td>
                         <td>@Display(metric.RestingHeartRateBpm)</td>
-                        <td>@Display(metric.HrvRmssdMilliseconds)</td>
+                        <td>@Display(metric.HrvRmssdMilliseconds, "F3")</td>
                         <td>@Display(metric.RunVo2MaxMlKgMin)</td>
                         <td>@Display(metric.ConsumedCaloriesKcal)</td>
-                        <td>@Display(metric.CarbohydratesGrams)</td>
-                        <td>@Display(metric.FatGrams)</td>
-                        <td>@Display(metric.ProteinGrams)</td>
+                        <td>@Display(metric.CarbohydratesGrams, "F2")</td>
+                        <td>@Display(metric.FatGrams, "F2")</td>
+                        <td>@Display(metric.ProteinGrams, "F2")</td>
                     </tr>
                 }
             }
@@ -335,14 +335,15 @@
         }
     }
 
-    private static string Display<T>(T? value) where T : struct
-        => value is null ? "—" : value.Value.ToString()!;
+    private static string Display<T>(T? value, string? format = null)
+        where T : struct, IFormattable =>
+        value is null ? "—" : value.Value.ToString(format, System.Globalization.CultureInfo.CurrentCulture);
 
-    private static string SummaryText(object? latest, double? avg7d, string unit)
+    private static string SummaryText(object? latest, double? avg7d, string unit, string decimalFormat = "F1")
     {
         if (latest is null) return "—";
-        var latestStr = latest is decimal d ? d.ToString("F1") : latest.ToString()!;
-        var avgStr    = avg7d is null ? "—" : avg7d.Value.ToString("F1");
+        var latestStr = latest is decimal d ? d.ToString(decimalFormat) : latest.ToString()!;
+        var avgStr    = avg7d is null ? "—" : avg7d.Value.ToString(decimalFormat);
         return $"{latestStr} {unit}  ·  avg {avgStr}";
     }
 

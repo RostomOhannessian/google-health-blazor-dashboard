@@ -110,6 +110,22 @@ public sealed class HealthEndpointTests
         Assert.Equal(HttpStatusCode.OK, script.StatusCode);
     }
 
+    [Fact]
+    public async Task RootDocument_FormatsHrvAndNutritionPrecision()
+    {
+        await using var factory = new HealthMetricsWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var response = await client.GetAsync("/");
+        var html = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("42.500 ms", html);
+        Assert.Contains("260.50", html);
+        Assert.Contains("70.00", html);
+        Assert.Contains("120.00", html);
+    }
+
     private sealed class HealthMetricsWebApplicationFactory : WebApplicationFactory<Program>
     {
         private readonly bool useRealAuthorization;

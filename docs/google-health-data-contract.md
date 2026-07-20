@@ -8,6 +8,7 @@ The dashboard intentionally exposes only fields with a Google Health API source 
 |---|---|---|---|
 | `RestingHeartRateBpm` | `daily-resting-heart-rate` | `list` | Daily value in bpm. |
 | `HrvRmssdMilliseconds` | `daily-heart-rate-variability` | `list` | Daily RMSSD value in milliseconds when available. |
+| `DailyVo2MaxMlKgMin` | `daily-vo2-max` | `list` | Daily cardio-fitness VO2 Max in ml/kg/min. |
 | `RunVo2MaxMlKgMin` | `run-vo2-max` | `dailyRollUp` | Average daily rollup value. |
 | `ConsumedCaloriesKcal` | `nutrition-log` | `dailyRollUp` | Energy rollup in kcal. |
 | `CarbohydratesGrams` | `nutrition-log` | `dailyRollUp` | Total carbohydrate rollup in grams. |

@@ -86,6 +86,16 @@ internal sealed class GoogleHealthApiClient(
                 "rmssd"),
             cancellationToken);
 
+        await MergeDailyListAsync(
+            snapshots,
+            "daily-vo2-max",
+            "daily_vo2_max",
+            startDate,
+            endDate,
+            accessToken,
+            (snapshot, point) => snapshot.DailyVo2MaxMlKgMin = ReadDecimal(point, "vo2Max", "value"),
+            cancellationToken);
+
         await MergeDailyRollupAsync(
             snapshots,
             "run-vo2-max",
@@ -423,6 +433,7 @@ internal sealed class GoogleHealthApiClient(
     private static bool HasAnyMetricValue(DailyMetricSnapshot snapshot) =>
         snapshot.RestingHeartRateBpm is not null
         || snapshot.HrvRmssdMilliseconds is not null
+        || snapshot.DailyVo2MaxMlKgMin is not null
         || snapshot.RunVo2MaxMlKgMin is not null
         || snapshot.ConsumedCaloriesKcal is not null
         || snapshot.CarbohydratesGrams is not null

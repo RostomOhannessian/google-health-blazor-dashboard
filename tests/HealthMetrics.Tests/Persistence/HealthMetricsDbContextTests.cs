@@ -133,11 +133,13 @@ public sealed class HealthMetricsDbContextTests
         await using var migratedContext = new HealthMetricsDbContext(options);
         var snapshot = await migratedContext.DailyMetricSnapshots.SingleAsync();
         Assert.Equal(58, snapshot.RestingHeartRateBpm);
+        Assert.Null(snapshot.DailyVo2MaxMlKgMin);
         Assert.Equal(47.2m, snapshot.RunVo2MaxMlKgMin);
         Assert.Equal(0, await migratedContext.HealthConnections.CountAsync());
 
         Assert.Equal(1, await ScalarAsync<long>(connection, "SELECT COUNT(*) FROM archived_legacy_metric_fields"));
         Assert.Equal(0, await ScalarAsync<long>(connection, $"SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = '{LegacyConnectionTable}'"));
+        Assert.Equal(1, await ScalarAsync<long>(connection, "SELECT COUNT(*) FROM pragma_table_info('daily_metric_snapshots') WHERE name = 'DailyVo2MaxMlKgMin'"));
         Assert.Equal(0, await ScalarAsync<long>(connection, "SELECT COUNT(*) FROM pragma_table_info('daily_metric_snapshots') WHERE name = 'FiberGrams'"));
     }
 

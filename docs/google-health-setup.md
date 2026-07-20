@@ -147,7 +147,7 @@ Why each is present:
 * `googlehealth.health_metrics_and_measurements.readonly` covers measurements
   such as resting heart rate and heart-rate variability.
 * `googlehealth.activity_and_fitness.readonly` covers the activity/fitness
-  data used for run VO2 Max.
+  data used for daily and run VO2 Max.
 * `googlehealth.nutrition.readonly` covers nutrition rollups for calories,
   carbohydrates, fat, and protein.
 

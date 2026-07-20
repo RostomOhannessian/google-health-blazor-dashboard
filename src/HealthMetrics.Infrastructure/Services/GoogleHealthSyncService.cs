@@ -135,6 +135,7 @@ internal sealed class GoogleHealthSyncService(
     {
         target.RestingHeartRateBpm = source.RestingHeartRateBpm;
         target.HrvRmssdMilliseconds = source.HrvRmssdMilliseconds;
+        target.DailyVo2MaxMlKgMin = source.DailyVo2MaxMlKgMin;
         target.RunVo2MaxMlKgMin = source.RunVo2MaxMlKgMin;
         target.ConsumedCaloriesKcal = source.ConsumedCaloriesKcal;
         target.CarbohydratesGrams = source.CarbohydratesGrams;
@@ -146,6 +147,7 @@ internal sealed class GoogleHealthSyncService(
     private static bool HasAnyMetricValue(DailyMetricSnapshot snapshot) =>
         snapshot.RestingHeartRateBpm is not null
         || snapshot.HrvRmssdMilliseconds is not null
+        || snapshot.DailyVo2MaxMlKgMin is not null
         || snapshot.RunVo2MaxMlKgMin is not null
         || snapshot.ConsumedCaloriesKcal is not null
         || snapshot.CarbohydratesGrams is not null

@@ -135,6 +135,7 @@
                 <th>Date</th>
                 <th>Resting HR</th>
                 <th>HRV (ms)</th>
+                <th>Daily VO2 Max</th>
                 <th>Run VO2 Max</th>
                 <th>Calories</th>
                 <th>Carbs (g)</th>
@@ -146,7 +147,7 @@
             @if (metrics.Count == 0)
             {
                 <tr>
-                    <td colspan="8" class="text-center text-muted py-3">
+                    <td colspan="9" class="text-center text-muted py-3">
                         @(connectionStatus?.IsConnected == true
                             ? "No data for this range — run a sync first."
                             : "Connect Google Health and run sync to start tracking.")
@@ -161,6 +162,7 @@
                         <td>@metric.MetricDate.ToString("MMM d")</td>
                         <td>@Display(metric.RestingHeartRateBpm)</td>
                         <td>@Display(metric.HrvRmssdMilliseconds, "F3")</td>
+                        <td>@Display(metric.DailyVo2MaxMlKgMin, "F1")</td>
                         <td>@Display(metric.RunVo2MaxMlKgMin)</td>
                         <td>@Display(metric.ConsumedCaloriesKcal)</td>
                         <td>@Display(metric.CarbohydratesGrams, "F2")</td>

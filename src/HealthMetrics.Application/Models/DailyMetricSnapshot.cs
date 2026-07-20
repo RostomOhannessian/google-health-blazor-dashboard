@@ -12,6 +12,8 @@ public sealed class DailyMetricSnapshot
 
     public decimal? HrvRmssdMilliseconds { get; set; }
 
+    public decimal? DailyVo2MaxMlKgMin { get; set; }
+
     public decimal? RunVo2MaxMlKgMin { get; set; }
 
     public int? ConsumedCaloriesKcal { get; set; }

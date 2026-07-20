@@ -33,6 +33,7 @@ public sealed class HealthMetricsDbContext(DbContextOptions<HealthMetricsDbConte
             entity.HasIndex(snapshot => new { snapshot.UserKey, snapshot.MetricDate }).IsUnique();
             entity.Property(snapshot => snapshot.UserKey).HasMaxLength(120).IsRequired();
             entity.Property(snapshot => snapshot.HrvRmssdMilliseconds).HasPrecision(9, 2);
+            entity.Property(snapshot => snapshot.DailyVo2MaxMlKgMin).HasPrecision(9, 2);
             entity.Property(snapshot => snapshot.RunVo2MaxMlKgMin).HasPrecision(9, 2);
             entity.Property(snapshot => snapshot.CarbohydratesGrams).HasPrecision(9, 2);
             entity.Property(snapshot => snapshot.FatGrams).HasPrecision(9, 2);

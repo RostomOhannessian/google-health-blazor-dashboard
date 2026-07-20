@@ -168,11 +168,11 @@ try
         var metrics = await metricQueryService.GetRecentMetricsAsync(requestedDays, cancellationToken);
 
         var sb = new StringBuilder();
-        sb.AppendLine("Date,RestingHR_bpm,HRV_RMSSD_ms,RunVO2Max_ml_kg_min,Calories_kcal,Carbs_g,Fat_g,Protein_g");
+        sb.AppendLine("Date,RestingHR_bpm,HRV_RMSSD_ms,DailyVO2Max_ml_kg_min,RunVO2Max_ml_kg_min,Calories_kcal,Carbs_g,Fat_g,Protein_g");
         foreach (var m in metrics.OrderBy(m => m.MetricDate))
         {
             sb.AppendLine(
-                $"{m.MetricDate},{m.RestingHeartRateBpm},{m.HrvRmssdMilliseconds},{m.RunVo2MaxMlKgMin}," +
+                $"{m.MetricDate},{m.RestingHeartRateBpm},{m.HrvRmssdMilliseconds},{m.DailyVo2MaxMlKgMin},{m.RunVo2MaxMlKgMin}," +
                 $"{m.ConsumedCaloriesKcal},{m.CarbohydratesGrams},{m.FatGrams},{m.ProteinGrams}");
         }
 

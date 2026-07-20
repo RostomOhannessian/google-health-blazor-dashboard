@@ -70,7 +70,7 @@ public sealed class HealthEndpointTests
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("text/csv", response.Content.Headers.ContentType!.MediaType);
-        Assert.StartsWith("Date,RestingHR_bpm,HRV_RMSSD_ms,RunVO2Max_ml_kg_min,Calories_kcal,Carbs_g,Fat_g,Protein_g", csv);
+        Assert.StartsWith("Date,RestingHR_bpm,HRV_RMSSD_ms,DailyVO2Max_ml_kg_min,RunVO2Max_ml_kg_min,Calories_kcal,Carbs_g,Fat_g,Protein_g", csv);
         Assert.DoesNotContain("Sodium", csv);
         Assert.DoesNotContain("Fiber", csv);
     }
@@ -223,6 +223,7 @@ public sealed class HealthEndpointTests
                     MetricDate = new DateOnly(2026, 7, 18),
                     RestingHeartRateBpm = 58,
                     HrvRmssdMilliseconds = 42.5m,
+                    DailyVo2MaxMlKgMin = 46.8m,
                     RunVo2MaxMlKgMin = 47.2m,
                     ConsumedCaloriesKcal = 2200,
                     CarbohydratesGrams = 260.5m,

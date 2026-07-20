@@ -33,6 +33,10 @@ namespace HealthMetrics.Infrastructure.Persistence.Migrations
                     b.Property<int?>("ConsumedCaloriesKcal")
                         .HasColumnType("INTEGER");
 
+                    b.Property<decimal?>("DailyVo2MaxMlKgMin")
+                        .HasPrecision(9, 2)
+                        .HasColumnType("TEXT");
+
                     b.Property<decimal?>("FatGrams")
                         .HasPrecision(9, 2)
                         .HasColumnType("TEXT");

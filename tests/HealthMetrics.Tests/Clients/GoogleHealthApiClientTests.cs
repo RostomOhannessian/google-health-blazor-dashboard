@@ -75,6 +75,18 @@ public sealed class GoogleHealthApiClientTests
                     }
                     """);
 
+            if (path.Contains("daily-vo2-max"))
+                return Json("""
+                    {
+                      "dataPoints": [
+                        {
+                          "date": { "year": 2026, "month": 7, "day": 18 },
+                          "value": { "dailyVo2Max": { "vo2Max": 46.8 } }
+                        }
+                      ]
+                    }
+                    """);
+
             if (path.Contains("run-vo2-max"))
                 return Json("""
                     {
@@ -116,6 +128,7 @@ public sealed class GoogleHealthApiClientTests
         Assert.Equal(new DateOnly(2026, 7, 18), snapshot.MetricDate);
         Assert.Equal(58, snapshot.RestingHeartRateBpm);
         Assert.Equal(42.5m, snapshot.HrvRmssdMilliseconds);
+        Assert.Equal(46.8m, snapshot.DailyVo2MaxMlKgMin);
         Assert.Equal(47.2m, snapshot.RunVo2MaxMlKgMin);
         Assert.Equal(2200, snapshot.ConsumedCaloriesKcal);
         Assert.Equal(260.5m, snapshot.CarbohydratesGrams);

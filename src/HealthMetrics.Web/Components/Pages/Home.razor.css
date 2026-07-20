@@ -9,8 +9,15 @@
 }
 
 .google-health-connect.is-pending {
+    background-color: transparent;
+    border-color: var(--bs-primary);
+    color: var(--bs-primary);
     cursor: wait;
     pointer-events: none;
+}
+
+.google-health-connect.is-pending > :first-child {
+    display: none;
 }
 
 .google-health-connect.is-pending .google-health-connect-spinner,

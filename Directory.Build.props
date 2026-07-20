@@ -1,8 +1,9 @@
 <Project>
   <!--
-    Explicit override for SQLitePCLRaw.lib.e_sqlite3 2.1.11: GHSA-2m69-gcr7-jv3q.
-    Pulled transitively by Microsoft.EntityFrameworkCore.Sqlite 10.0.0 across all projects.
-    Remove when upstream ships a safe version natively.
+    Security override for SQLitePCLRaw.lib.e_sqlite3: GHSA-2m69-gcr7-jv3q.
+    Pulled transitively by Microsoft.EntityFrameworkCore.Sqlite 10.0.0.
+    TODO: Re-evaluate and remove this pin once the upstream EF Core 10 package
+          ships a safe version of SQLitePCLRaw natively.
   -->
   <ItemGroup>
     <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.53.3" />

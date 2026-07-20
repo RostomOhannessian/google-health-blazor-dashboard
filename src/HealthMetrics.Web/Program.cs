@@ -1,9 +1,11 @@
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using HealthMetrics.Application.Interfaces;
 using HealthMetrics.Infrastructure.DependencyInjection;
 using HealthMetrics.Infrastructure.Persistence;
 using HealthMetrics.Web.Components;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Serilog;
@@ -26,6 +28,7 @@ try
     builder.Services.AddRazorComponents()
         .AddInteractiveServerComponents();
     builder.Services.AddMemoryCache();
+    builder.Services.AddDataProtection().SetApplicationName("HealthMetrics");
     builder.Services.AddHealthMetricsInfrastructure(builder.Configuration);
 
     var app = builder.Build();
@@ -171,9 +174,8 @@ try
         sb.AppendLine("Date,RestingHR_bpm,HRV_RMSSD_ms,DailyVO2Max_ml_kg_min,RunVO2Max_ml_kg_min,Calories_kcal,Carbs_g,Fat_g,Protein_g");
         foreach (var m in metrics.OrderBy(m => m.MetricDate))
         {
-            sb.AppendLine(
-                $"{m.MetricDate},{m.RestingHeartRateBpm},{m.HrvRmssdMilliseconds},{m.DailyVo2MaxMlKgMin},{m.RunVo2MaxMlKgMin}," +
-                $"{m.ConsumedCaloriesKcal},{m.CarbohydratesGrams},{m.FatGrams},{m.ProteinGrams}");
+            sb.AppendLine(string.Create(CultureInfo.InvariantCulture,
+                $"{m.MetricDate:yyyy-MM-dd},{m.RestingHeartRateBpm},{m.HrvRmssdMilliseconds},{m.DailyVo2MaxMlKgMin},{m.RunVo2MaxMlKgMin},{m.ConsumedCaloriesKcal},{m.CarbohydratesGrams},{m.FatGrams},{m.ProteinGrams}"));
         }
 
         var filename = $"health-metrics-{DateOnly.FromDateTime(DateTime.UtcNow):yyyy-MM-dd}.csv";

@@ -1,15 +1,11 @@
-using Google.Apis.Auth.OAuth2;
-using Google.Apis.Auth.OAuth2.Flows;
 using Google.Apis.Auth.OAuth2.Responses;
 using HealthMetrics.Application.Interfaces;
 using HealthMetrics.Application.Models;
 using HealthMetrics.Infrastructure.Clients;
-using HealthMetrics.Infrastructure.Options;
 using HealthMetrics.Infrastructure.Persistence;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace HealthMetrics.Infrastructure.Services;
 
@@ -17,23 +13,17 @@ internal sealed class GoogleHealthAuthorizationService(
     HealthMetricsDbContext dbContext,
     GoogleHealthApiClient googleHealthApiClient,
     GoogleAccountApiClient googleAccountApiClient,
-    IOptions<GoogleHealthApiOptions> options,
+    IGoogleAuthAdapter authAdapter,
     IDataProtectionProvider dataProtectionProvider,
     ILogger<GoogleHealthAuthorizationService> logger) : IHealthAuthorizationService
 {
-    private readonly GoogleHealthApiOptions _options = options.Value;
     private readonly IDataProtector _tokenProtector =
         dataProtectionProvider.CreateProtector("HealthMetrics.GoogleTokens.v1");
 
     public Task<Uri> BuildAuthorizationUriAsync(string state, CancellationToken cancellationToken = default)
     {
-        logger.LogInformation("Building Google Health authorization URL for {ScopeCount} scope(s).", _options.Scopes.Length);
-        var request = CreateFlow(prompt: "consent").CreateAuthorizationCodeRequest(_options.RedirectUri);
-        request.State = state;
-
-        var uri = request.Build();
-        logger.LogInformation("Google Health authorization URL built.");
-        return Task.FromResult(uri);
+        logger.LogInformation("Building Google Health authorization URL.");
+        return authAdapter.BuildAuthorizationUriAsync(state, cancellationToken);
     }
 
     public async Task HandleAuthorizationCodeAsync(string code, CancellationToken cancellationToken = default)
@@ -42,8 +32,7 @@ internal sealed class GoogleHealthAuthorizationService(
         TokenResponse token;
         try
         {
-            token = await CreateFlow(prompt: "consent")
-                .ExchangeCodeForTokenAsync(LocalUser.Key, code, _options.RedirectUri, cancellationToken);
+            token = await authAdapter.ExchangeCodeForTokenAsync(code, cancellationToken);
         }
         catch (TokenResponseException ex)
         {
@@ -60,6 +49,9 @@ internal sealed class GoogleHealthAuthorizationService(
         var connection = await dbContext.HealthConnections
             .SingleOrDefaultAsync(item => item.UserKey == LocalUser.Key, cancellationToken);
         var isNewConnection = connection is null;
+
+        var scopeCount = NormalizeScope(token.Scope)
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries).Length;
 
         if (connection is null)
         {
@@ -95,7 +87,7 @@ internal sealed class GoogleHealthAuthorizationService(
         logger.LogInformation(
             "Google Health connection {ConnectionAction}. ScopeCount: {ScopeCount}; AccessTokenExpiresAtUtc: {AccessTokenExpiresAtUtc}; RefreshTokenExpiresAtUtc: {RefreshTokenExpiresAtUtc}.",
             isNewConnection ? "created" : "replaced",
-            connection.Scope.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length,
+            scopeCount,
             connection.AccessTokenExpiresAtUtc,
             connection.RefreshTokenExpiresAtUtc);
     }
@@ -113,8 +105,7 @@ internal sealed class GoogleHealthAuthorizationService(
             TokenResponse token;
             try
             {
-                token = await CreateFlow(prompt: null)
-                    .RefreshTokenAsync(LocalUser.Key, refreshToken, cancellationToken);
+            token = await authAdapter.RefreshTokenAsync(refreshToken, cancellationToken);
             }
             catch (TokenResponseException ex)
             {
@@ -176,7 +167,7 @@ internal sealed class GoogleHealthAuthorizationService(
         var refreshToken = _tokenProtector.Unprotect(connection.RefreshToken);
         try
         {
-            await CreateFlow(prompt: null).RevokeTokenAsync(LocalUser.Key, refreshToken, cancellationToken);
+            await authAdapter.RevokeTokenAsync(refreshToken, cancellationToken);
             logger.LogInformation("Google Health remote token revocation succeeded.");
         }
         catch (Exception ex)
@@ -188,19 +179,6 @@ internal sealed class GoogleHealthAuthorizationService(
         await dbContext.SaveChangesAsync(cancellationToken);
         logger.LogInformation("Google Health local connection cleanup completed.");
     }
-
-    private GoogleAuthorizationCodeFlow CreateFlow(string? prompt) =>
-        new(new GoogleAuthorizationCodeFlow.Initializer
-        {
-            ClientSecrets = new ClientSecrets
-            {
-                ClientId = _options.ClientId,
-                ClientSecret = _options.ClientSecret
-            },
-            Scopes = _options.Scopes,
-            IncludeGrantedScopes = true,
-            Prompt = prompt
-        });
 
     private static DateTimeOffset CalculateExpiry(TokenResponse token)
     {
@@ -220,6 +198,6 @@ internal sealed class GoogleHealthAuthorizationService(
         return DateTimeOffset.UtcNow.AddSeconds(seconds);
     }
 
-    private string NormalizeScope(string? scope, string? fallback = null)
-        => string.IsNullOrWhiteSpace(scope) ? fallback ?? string.Join(' ', _options.Scopes) : scope;
+    private static string NormalizeScope(string? scope, string? fallback = null)
+        => string.IsNullOrWhiteSpace(scope) ? fallback ?? string.Empty : scope;
 }

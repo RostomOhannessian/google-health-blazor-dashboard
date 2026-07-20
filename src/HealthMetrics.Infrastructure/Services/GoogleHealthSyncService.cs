@@ -14,11 +14,26 @@ internal sealed class GoogleHealthSyncService(
     GoogleHealthApiClient googleHealthApiClient,
     ILogger<GoogleHealthSyncService> logger) : IHealthSyncService
 {
+    private static readonly SemaphoreSlim SyncLock = new(1, 1);
+
     public async Task<SyncResult> SyncRecentDaysAsync(int dayCount, CancellationToken cancellationToken = default)
     {
         if (dayCount <= 0 || dayCount > 90)
             throw new ArgumentOutOfRangeException(nameof(dayCount), "Day count must be between 1 and 90.");
 
+        await SyncLock.WaitAsync(cancellationToken);
+        try
+        {
+        return await RunSyncCoreAsync(dayCount, cancellationToken);
+        }
+        finally
+        {
+            SyncLock.Release();
+        }
+    }
+
+    private async Task<SyncResult> RunSyncCoreAsync(int dayCount, CancellationToken cancellationToken)
+    {
         var stopwatch = Stopwatch.StartNew();
         var historyEntry = new SyncHistoryEntry
         {
@@ -95,7 +110,7 @@ internal sealed class GoogleHealthSyncService(
 
             historyEntry.CompletedAtUtc = DateTimeOffset.UtcNow;
             historyEntry.PersistedDays = persistedDays;
-            historyEntry.Outcome = SyncOutcome.Success;
+            historyEntry.Outcome = daysWithMetricValues > 0 ? SyncOutcome.Success : SyncOutcome.PartialSuccess;
 
             await dbContext.SaveChangesAsync(cancellationToken);
             stopwatch.Stop();
@@ -133,14 +148,16 @@ internal sealed class GoogleHealthSyncService(
 
     private static void Merge(DailyMetricSnapshot target, DailyMetricSnapshot source)
     {
-        target.RestingHeartRateBpm = source.RestingHeartRateBpm;
-        target.HrvRmssdMilliseconds = source.HrvRmssdMilliseconds;
-        target.DailyVo2MaxMlKgMin = source.DailyVo2MaxMlKgMin;
-        target.RunVo2MaxMlKgMin = source.RunVo2MaxMlKgMin;
-        target.ConsumedCaloriesKcal = source.ConsumedCaloriesKcal;
-        target.CarbohydratesGrams = source.CarbohydratesGrams;
-        target.FatGrams = source.FatGrams;
-        target.ProteinGrams = source.ProteinGrams;
+        // Coalesce: only overwrite a stored value when the new fetch provides one.
+        // This prevents a partial re-sync from silently wiping previously-captured metrics.
+        target.RestingHeartRateBpm = source.RestingHeartRateBpm ?? target.RestingHeartRateBpm;
+        target.HrvRmssdMilliseconds = source.HrvRmssdMilliseconds ?? target.HrvRmssdMilliseconds;
+        target.DailyVo2MaxMlKgMin = source.DailyVo2MaxMlKgMin ?? target.DailyVo2MaxMlKgMin;
+        target.RunVo2MaxMlKgMin = source.RunVo2MaxMlKgMin ?? target.RunVo2MaxMlKgMin;
+        target.ConsumedCaloriesKcal = source.ConsumedCaloriesKcal ?? target.ConsumedCaloriesKcal;
+        target.CarbohydratesGrams = source.CarbohydratesGrams ?? target.CarbohydratesGrams;
+        target.FatGrams = source.FatGrams ?? target.FatGrams;
+        target.ProteinGrams = source.ProteinGrams ?? target.ProteinGrams;
         target.CapturedAtUtc = source.CapturedAtUtc;
     }
 

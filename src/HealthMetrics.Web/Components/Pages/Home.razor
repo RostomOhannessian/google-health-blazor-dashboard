@@ -1,9 +1,11 @@
 @page "/"
 @rendermode InteractiveServer
+@implements IAsyncDisposable
 @inject IHealthAuthorizationService OAuthService
 @inject IHealthSyncService SyncService
 @inject IMetricQueryService MetricQueryService
 @inject IDemoSeedService DemoSeedService
+@inject ILogger<Home> Logger
 @inject IJSRuntime JS
 
 <PageTitle>Health Metrics</PageTitle>
@@ -226,6 +228,7 @@
 }
 
 @code {
+    private readonly CancellationTokenSource _cts = new();
     private readonly List<DailyMetricSnapshot> metrics = [];
     private readonly List<SyncHistoryEntry> syncHistory = [];
     private HealthConnectionStatus? connectionStatus;
@@ -240,6 +243,12 @@
     protected override async Task OnInitializedAsync()
     {
         await LoadDataAsync();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await _cts.CancelAsync();
+        _cts.Dispose();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -262,12 +271,13 @@
             lastError = null;
             isSyncing = true;
             StateHasChanged();
-            await SyncService.SyncRecentDaysAsync(selectedDays);
+            await SyncService.SyncRecentDaysAsync(selectedDays, _cts.Token);
             await LoadDataAsync();
         }
         catch (Exception ex)
         {
-            lastError = ex.Message;
+            Logger.LogError(ex, "Manual sync failed for {Days} days.", selectedDays);
+            lastError = "Sync failed. Check the application logs for details.";
         }
         finally
         {
@@ -280,19 +290,20 @@
         try
         {
             lastError = null;
-            connectionStatus = await OAuthService.GetConnectionStatusAsync();
-            var loaded = await MetricQueryService.GetRecentMetricsAsync(selectedDays);
+            connectionStatus = await OAuthService.GetConnectionStatusAsync(_cts.Token);
+            var loaded = await MetricQueryService.GetRecentMetricsAsync(selectedDays, _cts.Token);
             metrics.Clear();
             metrics.AddRange(loaded);
             summary = MetricSummary.From(metrics);
-            var history = await MetricQueryService.GetRecentSyncHistoryAsync(10);
+            var history = await MetricQueryService.GetRecentSyncHistoryAsync(10, _cts.Token);
             syncHistory.Clear();
             syncHistory.AddRange(history);
             chartNeedsRender = true;
         }
         catch (Exception ex)
         {
-            lastError = ex.Message;
+            Logger.LogError(ex, "Failed to load dashboard data.");
+            lastError = "Failed to load data. Check the application logs for details.";
         }
     }
 
@@ -307,12 +318,13 @@
         try
         {
             lastError = null;
-            await OAuthService.DisconnectAsync();
+            await OAuthService.DisconnectAsync(_cts.Token);
             await LoadDataAsync();
         }
         catch (Exception ex)
         {
-            lastError = ex.Message;
+            Logger.LogError(ex, "Disconnect from Google Health failed.");
+            lastError = "Disconnect failed. Check the application logs for details.";
         }
     }
 
@@ -323,13 +335,14 @@
             isSeeding   = true;
             seedMessage = null;
             StateHasChanged();
-            var inserted = await DemoSeedService.SeedAsync(30);
+            var inserted = await DemoSeedService.SeedAsync(30, _cts.Token);
             seedMessage = $"{inserted} day(s) of demo data inserted.";
             await LoadDataAsync();
         }
         catch (Exception ex)
         {
-            seedMessage = ex.Message;
+            Logger.LogError(ex, "Demo data seed failed.");
+            seedMessage = "Demo seed failed. Check the application logs for details.";
         }
         finally
         {

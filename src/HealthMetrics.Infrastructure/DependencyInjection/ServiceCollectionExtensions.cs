@@ -3,6 +3,7 @@ using HealthMetrics.Infrastructure.Clients;
 using HealthMetrics.Infrastructure.Options;
 using HealthMetrics.Infrastructure.Persistence;
 using HealthMetrics.Infrastructure.Services;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -63,6 +64,7 @@ public static class ServiceCollectionExtensions
         });
 
         services.AddScoped<IHealthAuthorizationService, GoogleHealthAuthorizationService>();
+        services.AddScoped<IGoogleAuthAdapter, DefaultGoogleAuthAdapter>();
         services.AddScoped<IHealthSyncService, GoogleHealthSyncService>();
         services.AddScoped<IMetricQueryService, MetricQueryService>();
         services.AddScoped<IDemoSeedService, DemoSeedService>();

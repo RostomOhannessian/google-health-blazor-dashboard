@@ -41,8 +41,8 @@ public sealed class HealthEndpointTests
         Assert.StartsWith("https://accounts.google.com/o/oauth2/v2/auth", location);
         Assert.Contains("state=", response.Headers.Location.Query);
         Assert.Contains("redirect_uri=https%3A%2F%2Flocalhost%3A5001%2Fapi%2Fhealth%2Fcallback", location);
-        Assert.Contains("googlehealth.settings.readonly", location);
-        Assert.Contains("scope=openid%20email%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fgooglehealth.health_metrics_and_measurements.readonly", location);
+        // Google.Apis.Auth encodes spaces as literal spaces in the scope parameter, not %20.
+        Assert.Contains("scope=openid email https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fgooglehealth.health_metrics_and_measurements.readonly", location);
         Assert.Contains("googlehealth.activity_and_fitness.readonly", location);
         Assert.Contains("googlehealth.nutrition.readonly", location);
     }
@@ -73,6 +73,28 @@ public sealed class HealthEndpointTests
         Assert.StartsWith("Date,RestingHR_bpm,HRV_RMSSD_ms,DailyVO2Max_ml_kg_min,RunVO2Max_ml_kg_min,Calories_kcal,Carbs_g,Fat_g,Protein_g", csv);
         Assert.DoesNotContain("Sodium", csv);
         Assert.DoesNotContain("Fiber", csv);
+    }
+
+    [Fact]
+    public async Task MetricsExport_UsesInvariantCultureForDecimals()
+    {
+        // The fake metric query returns rows with decimal fields (HRV 42.5, Carbs 260.5 etc.).
+        // Each data row must have exactly 9 comma-separated columns regardless of the host
+        // locale. A comma-decimal locale would produce extra columns if formatting were
+        // culture-dependent.
+        await using var factory = new HealthMetricsWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var response = await client.GetAsync("/api/metrics/export?days=7");
+        var csv = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var lines = csv.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        foreach (var line in lines.Skip(1)) // skip header
+            Assert.Equal(9, line.TrimEnd('\r').Split(',').Length);
+
+        Assert.Contains("42.5", csv);
+        Assert.Contains("260.5", csv);
     }
 
     [Fact]

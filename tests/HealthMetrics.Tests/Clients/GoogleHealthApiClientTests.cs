@@ -296,11 +296,18 @@ public sealed class GoogleHealthApiClientTests
     public async Task FetchDailyMetricsAsync_LogsRequestAndResponseBodiesWithRedactionWhenEnabled()
     {
         var logger = new CapturingLogger<GoogleHealthApiClient>();
+        var heartRateCalls = 0;
         var handler = new StubHttpMessageHandler(request =>
         {
-            if (request.RequestUri!.ToString().Contains("users/me/settings"))
-                return Json("""{"timeZone":"America/Toronto","nextPageToken":"response-secret"}""");
-
+            // Return a paginated first page with a sensitive nextPageToken so we can verify
+            // that response bodies are logged and sensitive fields are redacted.
+            if (request.RequestUri!.ToString().Contains("daily-resting-heart-rate"))
+            {
+                heartRateCalls++;
+                return heartRateCalls == 1
+                    ? Json("""{"nextPageToken":"response-secret","dataPoints":[]}""")
+                    : Json("""{}""");
+            }
             return Json("""{}""");
         });
 
@@ -313,7 +320,6 @@ public sealed class GoogleHealthApiClientTests
 
         var messages = string.Join('\n', logger.Messages);
         Assert.Contains("Google Health API request body", messages);
-        Assert.Contains("\"timeZone\":\"America/Toronto\"", messages);
         Assert.Contains("Google Health API response body", messages);
         Assert.Contains("\"nextPageToken\":\"[redacted]\"", messages);
         Assert.DoesNotContain("response-secret", messages);

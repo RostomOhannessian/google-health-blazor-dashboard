@@ -69,7 +69,7 @@ public sealed class GoogleHealthApiClientTests
                       "dataPoints": [
                         {
                           "date": { "year": 2026, "month": 7, "day": 18 },
-                          "value": { "dailyHeartRateVariability": { "rmssdMilliseconds": 42.5 } }
+                          "value": { "dailyHeartRateVariability": { "averageHeartRateVariabilityMilliseconds": 42.5 } }
                         }
                       ]
                     }
@@ -78,10 +78,10 @@ public sealed class GoogleHealthApiClientTests
             if (path.Contains("run-vo2-max"))
                 return Json("""
                     {
-                      "dailyRollupDataPoints": [
+                      "rollupDataPoints": [
                         {
-                          "date": { "year": 2026, "month": 7, "day": 18 },
-                          "value": { "runVo2Max": { "rateAvg": 47.2 } }
+                          "civilStartTime": { "date": { "year": 2026, "month": 7, "day": 18 } },
+                          "runVo2Max": { "rateAvg": 47.2 }
                         }
                       ]
                     }
@@ -90,18 +90,16 @@ public sealed class GoogleHealthApiClientTests
             if (path.Contains("nutrition-log"))
                 return Json("""
                     {
-                      "dailyRollupDataPoints": [
+                      "rollupDataPoints": [
                         {
-                          "date": { "year": 2026, "month": 7, "day": 18 },
-                          "value": {
-                            "nutritionLog": {
-                              "energy": { "kcalSum": 2200 },
-                              "totalCarbohydrate": { "gramsSum": 260.5 },
-                              "totalFat": { "gramsSum": 70 },
-                              "nutrients": [
-                                { "nutrient": "PROTEIN", "quantity": { "gramsSum": 120 } }
-                              ]
-                            }
+                          "civilStartTime": { "date": { "year": 2026, "month": 7, "day": 18 } },
+                          "nutritionLog": {
+                            "energy": { "kcalSum": 2200 },
+                            "totalCarbohydrate": { "gramsSum": 260.5 },
+                            "totalFat": { "gramsSum": 70 },
+                            "nutrients": [
+                              { "nutrient": "PROTEIN", "quantity": { "gramsSum": 120 } }
+                            ]
                           }
                         }
                       ]

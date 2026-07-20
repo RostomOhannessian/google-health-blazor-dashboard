@@ -76,7 +76,14 @@ internal sealed class GoogleHealthApiClient(
             startDate,
             endDate,
             accessToken,
-            (snapshot, point) => snapshot.HrvRmssdMilliseconds = ReadDecimal(point, "rmssdMilliseconds", "rmssdMillis", "dailyRmssd", "rmssd"),
+            (snapshot, point) => snapshot.HrvRmssdMilliseconds = ReadDecimal(
+                point,
+                "averageHeartRateVariabilityMilliseconds",
+                "deepSleepRootMeanSquareOfSuccessiveDifferencesMilliseconds",
+                "rmssdMilliseconds",
+                "rmssdMillis",
+                "dailyRmssd",
+                "rmssd"),
             cancellationToken);
 
         await MergeDailyRollupAsync(
@@ -429,6 +436,9 @@ internal sealed class GoogleHealthApiClient(
 
         if (root.TryGetProperty("dailyRollupDataPoints", out var dailyRollups) && dailyRollups.ValueKind is JsonValueKind.Array)
             return dailyRollups.EnumerateArray();
+
+        if (root.TryGetProperty("rollupDataPoints", out var rollupDataPoints) && rollupDataPoints.ValueKind is JsonValueKind.Array)
+            return rollupDataPoints.EnumerateArray();
 
         return [];
     }

@@ -37,7 +37,7 @@ The migration archives those retired fields in `archived_legacy_metric_fields` b
 
 `GoogleHealthApiClient` isolates Google JSON parsing from the application model. It handles:
 
-- `dataPoints` and `dailyRollupDataPoints`
+- `dataPoints`, `dailyRollupDataPoints`, and `rollupDataPoints`
 - `nextPageToken`
 - the canonical `healthUserId` returned by `users/me/identity`
 - nested union-style `value` payloads

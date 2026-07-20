@@ -39,10 +39,10 @@ The migration archives those retired fields in `archived_legacy_metric_fields` b
 
 - `dataPoints` and `dailyRollupDataPoints`
 - `nextPageToken`
+- the canonical `healthUserId` returned by `users/me/identity`
 - nested union-style `value` payloads
 - civil date objects
 - numeric strings or JSON numbers
 - API failures with sanitized error messages
 
 No live Google calls are made in tests; fixture responses cover the supported payload shapes.
-

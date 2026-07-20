@@ -10,6 +10,21 @@ namespace HealthMetrics.Tests.Clients;
 public sealed class GoogleHealthApiClientTests
 {
     [Fact]
+    public async Task GetIdentityAsync_ReturnsGoogleHealthUserId()
+    {
+        var handler = new StubHttpMessageHandler(_ =>
+            Json("""{"name":"users/me/identity","healthUserId":"google-health-user-123","legacyUserId":"fitbit-user-456"}"""));
+        var client = CreateClient(handler);
+
+        var userId = await client.GetIdentityAsync("token", CancellationToken.None);
+
+        Assert.Equal("google-health-user-123", userId);
+        var request = Assert.Single(handler.Requests);
+        Assert.Equal(HttpMethod.Get, request.Method);
+        Assert.Contains("users/me/identity", request.Uri);
+    }
+
+    [Fact]
     public async Task FetchDailyMetricsAsync_MapsGoogleHealthDailyData()
     {
         var handler = new StubHttpMessageHandler(request =>

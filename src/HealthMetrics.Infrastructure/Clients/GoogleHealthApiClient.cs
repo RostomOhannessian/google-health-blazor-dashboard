@@ -30,7 +30,7 @@ internal sealed class GoogleHealthApiClient(
         using var doc = await SendJsonAsync(HttpMethod.Get, "users/me/identity", accessToken, null, cancellationToken);
         var root = doc.RootElement;
 
-        return FindString(root, "googleUserId", "google_user_id", "userId", "id")
+        return FindString(root, "healthUserId", "googleUserId", "google_user_id", "userId", "id")
             ?? throw new InvalidOperationException("Google Health identity response did not include a user id.");
     }
 

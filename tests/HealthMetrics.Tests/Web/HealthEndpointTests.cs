@@ -40,6 +40,7 @@ public sealed class HealthEndpointTests
         Assert.StartsWith("https://accounts.google.com/o/oauth2/v2/auth", location);
         Assert.Contains("state=", response.Headers.Location.Query);
         Assert.Contains("redirect_uri=https%3A%2F%2Flocalhost%3A5001%2Fapi%2Fhealth%2Fcallback", location);
+        Assert.Contains("googlehealth.settings.readonly", location);
         Assert.Contains("scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fgooglehealth.health_metrics_and_measurements.readonly", location);
         Assert.Contains("googlehealth.activity_and_fitness.readonly", location);
         Assert.Contains("googlehealth.nutrition.readonly", location);
@@ -111,9 +112,10 @@ public sealed class HealthEndpointTests
                     new KeyValuePair<string, string?>("GoogleHealthApi:ClientId", "health-metrics-test-client"),
                     new KeyValuePair<string, string?>("GoogleHealthApi:ClientSecret", "health-metrics-test-secret"),
                     new KeyValuePair<string, string?>("GoogleHealthApi:RedirectUri", "https://localhost:5001/api/health/callback"),
-                    new KeyValuePair<string, string?>("GoogleHealthApi:Scopes:0", "https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly"),
-                    new KeyValuePair<string, string?>("GoogleHealthApi:Scopes:1", "https://www.googleapis.com/auth/googlehealth.activity_and_fitness.readonly"),
-                    new KeyValuePair<string, string?>("GoogleHealthApi:Scopes:2", "https://www.googleapis.com/auth/googlehealth.nutrition.readonly")
+                    new KeyValuePair<string, string?>("GoogleHealthApi:Scopes:0", "https://www.googleapis.com/auth/googlehealth.settings.readonly"),
+                    new KeyValuePair<string, string?>("GoogleHealthApi:Scopes:1", "https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly"),
+                    new KeyValuePair<string, string?>("GoogleHealthApi:Scopes:2", "https://www.googleapis.com/auth/googlehealth.activity_and_fitness.readonly"),
+                    new KeyValuePair<string, string?>("GoogleHealthApi:Scopes:3", "https://www.googleapis.com/auth/googlehealth.nutrition.readonly")
                 ]);
             });
             builder.ConfigureServices(services =>

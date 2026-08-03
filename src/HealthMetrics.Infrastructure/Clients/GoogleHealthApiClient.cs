@@ -317,7 +317,7 @@ internal sealed class GoogleHealthApiClient(
         if (fatBurn is null || cardio is null || peak is null)
             return;
 
-        snapshot.CardioLoad = fatBurn.Value + cardio.Value + peak.Value;
+        snapshot.ActiveZoneMinutes = fatBurn.Value + cardio.Value + peak.Value;
     }
 
     private static void ApplyNutrition(DailyMetricSnapshot snapshot, JsonElement point)
@@ -519,7 +519,7 @@ internal sealed class GoogleHealthApiClient(
         || snapshot.HrvRmssdMilliseconds is not null
         || snapshot.DailyVo2MaxMlKgMin is not null
         || snapshot.RunVo2MaxMlKgMin is not null
-        || snapshot.CardioLoad is not null
+        || snapshot.ActiveZoneMinutes is not null
         || snapshot.SleepEfficiency is not null
         || snapshot.DeepSleepMinutes is not null
         || snapshot.RemSleepMinutes is not null

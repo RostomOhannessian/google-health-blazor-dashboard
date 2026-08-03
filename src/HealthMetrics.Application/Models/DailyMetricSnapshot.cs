@@ -24,6 +24,10 @@ public sealed class DailyMetricSnapshot
 
     public decimal? Acwr { get; set; }
 
+    public decimal? ActiveZoneMinutes { get; set; }
+
+    public decimal? ActiveZoneMinutesAcwr { get; set; }
+
     public decimal? SleepEfficiency { get; set; }
 
     public int? DeepSleepMinutes { get; set; }

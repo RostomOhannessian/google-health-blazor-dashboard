@@ -4,6 +4,7 @@
 @inject IHealthAuthorizationService OAuthService
 @inject IHealthSyncService SyncService
 @inject IMetricQueryService MetricQueryService
+@inject IManualLoadEntryService ManualLoadEntryService
 @inject IDemoSeedService DemoSeedService
 @inject ILogger<Home> Logger
 @inject IJSRuntime JS
@@ -18,7 +19,7 @@
         <button type="button" class="btn @(selectedDays == 90 ? "btn-primary" : "btn-outline-primary")" @onclick="@(() => ChangeRangeAsync(90))">90 d</button>
     </div>
 </div>
-<p class="text-muted mb-3">Daily heart, recovery, Active Zone Minutes, sleep, fitness, and nutrition metrics synced from the Google Health API and persisted locally.</p>
+<p class="text-muted mb-3">Daily heart, recovery, provider Active Zone Minutes, manually entered Cardio Load, sleep, fitness, and nutrition metrics persisted locally.</p>
 
 <div class="d-flex flex-wrap gap-2 mb-4">
     @if (connectionStatus?.IsConnected != true)
@@ -48,6 +49,39 @@
 {
     <div class="alert alert-danger" role="alert">@lastError</div>
 }
+
+<div class="card mb-4">
+    <div class="card-header fw-semibold">Manual Cardio Load entry</div>
+    <div class="card-body">
+        <div class="row g-2 align-items-end">
+            <div class="col-sm-3">
+                <label class="form-label" for="manual-load-date">Date</label>
+                <InputDate id="manual-load-date" class="form-control" @bind-Value="manualMetricDate" />
+            </div>
+            <div class="col-sm-3">
+                <label class="form-label" for="manual-cardio-load">Cardio Load</label>
+                <InputNumber id="manual-cardio-load" class="form-control" @bind-Value="manualCardioLoad" />
+            </div>
+            <div class="col-sm-2">
+                <label class="form-label" for="manual-target-min">Target min</label>
+                <InputNumber id="manual-target-min" class="form-control" @bind-Value="manualTargetLoadMin" />
+            </div>
+            <div class="col-sm-2">
+                <label class="form-label" for="manual-target-max">Target max</label>
+                <InputNumber id="manual-target-max" class="form-control" @bind-Value="manualTargetLoadMax" />
+            </div>
+            <div class="col-sm-2 d-flex gap-2">
+                <button class="btn btn-primary" type="button" @onclick="SaveManualLoadAsync" disabled="@isSavingManual">@(isSavingManual ? "Saving…" : "Save")</button>
+                <button class="btn btn-outline-secondary" type="button" @onclick="ClearManualLoadInputs">Clear</button>
+            </div>
+        </div>
+        <div class="form-text">Leave a value blank and save to clear it. Manual values never replace synced provider metrics.</div>
+        @if (!string.IsNullOrWhiteSpace(manualEntryMessage))
+        {
+            <div class="alert @(manualEntryError ? "alert-danger" : "alert-success") mt-3 mb-0" role="alert">@manualEntryMessage</div>
+        }
+    </div>
+</div>
 
 <div class="row g-3 mb-4">
     <div class="col-sm-6 col-xl-2">
@@ -122,21 +156,45 @@
     <div class="col-sm-6 col-xl-2">
         <div class="card h-100">
             <div class="card-body">
-                <h6 class="card-subtitle text-muted mb-1">Daily Active Zone Minutes (AZM)</h6>
+                <h6 class="card-subtitle text-muted mb-1">Manual Cardio Load</h6>
                 <p class="card-text fw-semibold mb-0">@CardioLoadText(summary)</p>
-                <small class="text-muted">Current day vs. local reference range</small>
+                <small class="text-muted">User-entered load and target</small>
             </div>
         </div>
     </div>
     <div class="col-sm-6 col-xl-2">
         <div class="card h-100">
             <div class="card-body">
-                <h6 class="card-subtitle text-muted mb-1">ACWR (Training Strain)</h6>
+                <h6 class="card-subtitle text-muted mb-1">Manual ACWR</h6>
                 <p class="card-text fw-semibold mb-0">
                     @Display(summary?.LatestAcwr, "F2")
                     @if (summary?.LatestAcwr is not null)
                     {
                         <span class="badge @AcwrBadge(summary.LatestAcwrStatus)">@AcwrLabel(summary.LatestAcwrStatus)</span>
+                    }
+                </p>
+                <small class="text-muted">7-day acute / 28-day chronic</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-2">
+        <div class="card h-100">
+            <div class="card-body">
+                <h6 class="card-subtitle text-muted mb-1">Active Zone Minutes (AZM)</h6>
+                <p class="card-text fw-semibold mb-0">@Display(summary?.LatestActiveZoneMinutes, "F1")</p>
+                <small class="text-muted">Synced from Google Health</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-2">
+        <div class="card h-100">
+            <div class="card-body">
+                <h6 class="card-subtitle text-muted mb-1">AZM ACWR</h6>
+                <p class="card-text fw-semibold mb-0">
+                    @Display(summary?.LatestActiveZoneMinutesAcwr, "F2")
+                    @if (summary?.LatestActiveZoneMinutesAcwr is not null)
+                    {
+                        <span class="badge @AcwrBadge(summary.LatestActiveZoneMinutesAcwrStatus)">@AcwrLabel(summary.LatestActiveZoneMinutesAcwrStatus)</span>
                     }
                 </p>
                 <small class="text-muted">7-day acute / 28-day chronic</small>
@@ -149,10 +207,10 @@
 {
     <div class="card mb-4">
         <div class="card-header d-flex align-items-center justify-content-between gap-2 flex-wrap">
-            <span class="fw-semibold">@(chartMode == ChartMode.Load ? "Active Zone Minutes & training strain" : "Heart rate & HRV trend")</span>
+            <span class="fw-semibold">@(chartMode == ChartMode.Load ? "Manual Cardio Load, Active Zone Minutes & training strain" : "Heart rate & HRV trend")</span>
             <div class="btn-group btn-group-sm" role="group" aria-label="Chart metric">
                 <button type="button" class="btn @(chartMode == ChartMode.Heart ? "btn-primary" : "btn-outline-primary")" @onclick="@(() => SetChartModeAsync(ChartMode.Heart))" disabled="@(!HasHeartMetrics)">Heart &amp; HRV</button>
-                <button type="button" class="btn @(chartMode == ChartMode.Load ? "btn-primary" : "btn-outline-primary")" @onclick="@(() => SetChartModeAsync(ChartMode.Load))" disabled="@(!HasLoadMetrics)">AZM &amp; Training Strain</button>
+                <button type="button" class="btn @(chartMode == ChartMode.Load ? "btn-primary" : "btn-outline-primary")" @onclick="@(() => SetChartModeAsync(ChartMode.Load))" disabled="@(!HasLoadMetrics)">Load &amp; AZM</button>
             </div>
         </div>
         <div class="card-body py-2">
@@ -165,7 +223,7 @@
     <h2 class="h5 mb-0">Daily snapshots</h2>
     <div class="d-flex align-items-center gap-3">
         <a href="/api/metrics/export?days=@selectedDays" class="small text-decoration-none" download>⬇ Export CSV</a>
-        <small class="text-muted">@metrics.Count of @selectedDays days · — = not returned by Google Health for that date</small>
+        <small class="text-muted">@metrics.Count of @selectedDays days · — = not recorded for that date</small>
     </div>
 </div>
 <div class="table-responsive">
@@ -177,9 +235,11 @@
                 <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("hrv"))">HRV (ms) @SortIndicator("hrv")</button></th>
                 <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("dailyVo2"))">Daily VO2 Max @SortIndicator("dailyVo2")</button></th>
                 <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("runVo2"))">Run VO2 Max @SortIndicator("runVo2")</button></th>
-                <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("cardioLoad"))">Active Zone Minutes (AZM) @SortIndicator("cardioLoad")</button></th>
-                <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("targetLoad"))">Local AZM Target @SortIndicator("targetLoad")</button></th>
-                <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("acwr"))">ACWR @SortIndicator("acwr")</button></th>
+                <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("cardioLoad"))">Manual Cardio Load @SortIndicator("cardioLoad")</button></th>
+                <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("targetLoad"))">Manual target @SortIndicator("targetLoad")</button></th>
+                <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("acwr"))">Manual ACWR @SortIndicator("acwr")</button></th>
+                <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("activeZoneMinutes"))">Active Zone Minutes (AZM) @SortIndicator("activeZoneMinutes")</button></th>
+                <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("activeZoneMinutesAcwr"))">AZM ACWR @SortIndicator("activeZoneMinutesAcwr")</button></th>
                 <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("sleepEfficiency"))">Sleep Efficiency (%) @SortIndicator("sleepEfficiency")</button></th>
                 <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("calories"))">Calories @SortIndicator("calories")</button></th>
                 <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("carbs"))">Carbs (g) @SortIndicator("carbs")</button></th>
@@ -191,7 +251,7 @@
             @if (metrics.Count == 0)
             {
                 <tr>
-                    <td colspan="13" class="text-center text-muted py-3">
+                    <td colspan="15" class="text-center text-muted py-3">
                         @(connectionStatus?.IsConnected == true
                             ? "No data for this range — run a sync first."
                             : "Connect Google Health and run sync to start tracking.")
@@ -211,6 +271,8 @@
                         <td>@Display(metric.CardioLoad, "F1")</td>
                         <td>@TargetLoadText(metric.TargetLoadMin, metric.TargetLoadMax)</td>
                         <td>@Display(metric.Acwr, "F2")</td>
+                        <td>@Display(metric.ActiveZoneMinutes, "F1")</td>
+                        <td>@Display(metric.ActiveZoneMinutesAcwr, "F2")</td>
                         <td>@Display(metric.SleepEfficiency, "F2")</td>
                         <td>@Display(metric.ConsumedCaloriesKcal)</td>
                         <td>@Display(metric.CarbohydratesGrams, "F2")</td>
@@ -281,8 +343,15 @@
     private MetricSummary? summary;
     private bool isSyncing;
     private bool isSeeding;
+    private bool isSavingManual;
+    private bool manualEntryError;
     private string? lastError;
     private string? seedMessage;
+    private string? manualEntryMessage;
+    private DateOnly manualMetricDate = DateOnly.FromDateTime(DateTime.UtcNow);
+    private decimal? manualCardioLoad;
+    private decimal? manualTargetLoadMin;
+    private decimal? manualTargetLoadMax;
     private int selectedDays = 30;
     private bool chartNeedsRender;
     private ChartMode chartMode = ChartMode.Heart;
@@ -293,7 +362,12 @@
         metrics.Any(m => m.RestingHeartRateBpm.HasValue || m.HrvRmssdMilliseconds.HasValue);
 
     private bool HasLoadMetrics =>
-        metrics.Any(m => m.CardioLoad.HasValue || m.TargetLoadMin.HasValue || m.TargetLoadMax.HasValue);
+        metrics.Any(m => m.CardioLoad.HasValue
+            || m.TargetLoadMin.HasValue
+            || m.TargetLoadMax.HasValue
+            || m.ActiveZoneMinutes.HasValue
+            || m.Acwr.HasValue
+            || m.ActiveZoneMinutesAcwr.HasValue);
 
     private IEnumerable<DailyMetricSnapshot> SortedMetrics =>
         sortColumn switch
@@ -305,6 +379,8 @@
             "cardioLoad" => Sort(metrics, metric => metric.CardioLoad),
             "targetLoad" => Sort(metrics, metric => metric.TargetLoadMin),
             "acwr" => Sort(metrics, metric => metric.Acwr),
+            "activeZoneMinutes" => Sort(metrics, metric => metric.ActiveZoneMinutes),
+            "activeZoneMinutesAcwr" => Sort(metrics, metric => metric.ActiveZoneMinutesAcwr),
             "sleepEfficiency" => Sort(metrics, metric => metric.SleepEfficiency),
             "calories" => Sort(metrics, metric => metric.ConsumedCaloriesKcal),
             "carbs" => Sort(metrics, metric => metric.CarbohydratesGrams),
@@ -337,7 +413,19 @@
                 var cardioLoadData = ordered.Select(m => (object?)m.CardioLoad).ToArray();
                 var targetMinData = ordered.Select(m => (object?)m.TargetLoadMin).ToArray();
                 var targetMaxData = ordered.Select(m => (object?)m.TargetLoadMax).ToArray();
-                await JS.InvokeVoidAsync("HealthCharts.renderLoad", "metricsChart", labels, cardioLoadData, targetMinData, targetMaxData);
+                var activeZoneMinutesData = ordered.Select(m => (object?)m.ActiveZoneMinutes).ToArray();
+                var manualAcwrData = ordered.Select(m => (object?)m.Acwr).ToArray();
+                var activeZoneMinutesAcwrData = ordered.Select(m => (object?)m.ActiveZoneMinutesAcwr).ToArray();
+                await JS.InvokeVoidAsync(
+                    "HealthCharts.renderLoad",
+                    "metricsChart",
+                    labels,
+                    cardioLoadData,
+                    targetMinData,
+                    targetMaxData,
+                    activeZoneMinutesData,
+                    manualAcwrData,
+                    activeZoneMinutesAcwrData);
             }
             else
             {
@@ -411,6 +499,46 @@
         await LoadDataAsync();
     }
 
+    private async Task SaveManualLoadAsync()
+    {
+        try
+        {
+            isSavingManual = true;
+            manualEntryMessage = null;
+            var result = await ManualLoadEntryService.SaveAsync(
+                new ManualLoadEntry(
+                    manualMetricDate,
+                    manualCardioLoad,
+                    manualTargetLoadMin,
+                    manualTargetLoadMax),
+                _cts.Token);
+            manualEntryError = !result.Succeeded;
+            manualEntryMessage = result.Succeeded
+                ? "Manual Cardio Load saved."
+                : result.ErrorMessage;
+            if (result.Succeeded)
+                await LoadDataAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Saving manual Cardio Load failed.");
+            manualEntryError = true;
+            manualEntryMessage = "Manual Cardio Load could not be saved. Check the application logs for details.";
+        }
+        finally
+        {
+            isSavingManual = false;
+        }
+    }
+
+    private void ClearManualLoadInputs()
+    {
+        manualCardioLoad = null;
+        manualTargetLoadMin = null;
+        manualTargetLoadMax = null;
+        manualEntryMessage = null;
+    }
+
     private async Task DisconnectAsync()
     {
         try
@@ -457,7 +585,7 @@
         if (metricSummary?.LatestCardioLoad is null)
             return "—";
 
-        return $"{metricSummary.LatestCardioLoad.Value:F1} / Local range: {TargetLoadText(metricSummary.LatestTargetLoadMin, metricSummary.LatestTargetLoadMax)}";
+        return $"{metricSummary.LatestCardioLoad.Value:F1} / Target: {TargetLoadText(metricSummary.LatestTargetLoadMin, metricSummary.LatestTargetLoadMax)}";
     }
 
     private static string TargetLoadText(decimal? min, decimal? max)

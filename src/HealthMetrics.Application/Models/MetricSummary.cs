@@ -13,7 +13,10 @@ public sealed record MetricSummary(
     decimal? LatestTargetLoadMin,
     decimal? LatestTargetLoadMax,
     decimal? LatestAcwr,
-    AcwrStatus LatestAcwrStatus)
+    AcwrStatus LatestAcwrStatus,
+    decimal? LatestActiveZoneMinutes,
+    decimal? LatestActiveZoneMinutesAcwr,
+    AcwrStatus LatestActiveZoneMinutesAcwrStatus)
 {
     public static MetricSummary From(IReadOnlyList<DailyMetricSnapshot> snapshots)
     {
@@ -35,7 +38,10 @@ public sealed record MetricSummary(
             LatestTargetLoadMin: latest?.TargetLoadMin,
             LatestTargetLoadMax: latest?.TargetLoadMax,
             LatestAcwr: latest?.Acwr,
-            LatestAcwrStatus: AcwrCalculator.GetStatus(latest?.Acwr));
+            LatestAcwrStatus: AcwrCalculator.GetStatus(latest?.Acwr),
+            LatestActiveZoneMinutes: latest?.ActiveZoneMinutes,
+            LatestActiveZoneMinutesAcwr: latest?.ActiveZoneMinutesAcwr,
+            LatestActiveZoneMinutesAcwrStatus: AcwrCalculator.GetStatus(latest?.ActiveZoneMinutesAcwr));
     }
 
     private static double? Avg(IEnumerable<double?> values)

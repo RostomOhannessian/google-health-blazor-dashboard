@@ -124,6 +124,7 @@ public sealed class DemoSeedServiceTests : IAsyncLifetime
             Assert.InRange(s.RestingHeartRateBpm!.Value, 52, 67);
             Assert.InRange(s.HrvRmssdMilliseconds!.Value, 30m, 65m);
             Assert.InRange(s.CardioLoad!.Value, 45m, 100m);
+            Assert.InRange(s.ActiveZoneMinutes!.Value, 30m, 90m);
             Assert.InRange(s.SleepEfficiency!.Value, 82m, 97m);
             Assert.InRange(s.DeepSleepMinutes!.Value, 45, 110);
             Assert.InRange(s.RemSleepMinutes!.Value, 70, 150);
@@ -131,18 +132,18 @@ public sealed class DemoSeedServiceTests : IAsyncLifetime
         }
 
         Assert.Contains(snapshots, snapshot => snapshot.Acwr is not null);
-        Assert.Equal(6, snapshots.Count(snapshot => snapshot.TargetLoadMin is null));
-        Assert.Equal(6, snapshots.Count(snapshot => snapshot.TargetLoadMax is null));
+        Assert.Contains(snapshots, snapshot => snapshot.ActiveZoneMinutesAcwr is not null);
+        Assert.All(snapshots, snapshot =>
+        {
+            Assert.NotNull(snapshot.TargetLoadMin);
+            Assert.NotNull(snapshot.TargetLoadMax);
+        });
         Assert.All(
-            snapshots.Where(snapshot => snapshot.TargetLoadMin is not null),
+            snapshots,
             snapshot =>
             {
-                var expected = TargetLoadCalculator.Calculate(
-                    snapshots.ToDictionary(item => item.MetricDate, item => item.CardioLoad),
-                    snapshot.MetricDate);
-                Assert.NotNull(expected);
-                Assert.Equal(expected.Value.Min, snapshot.TargetLoadMin);
-                Assert.Equal(expected.Value.Max, snapshot.TargetLoadMax);
+                Assert.Equal(Math.Round(snapshot.CardioLoad!.Value * 0.8m, 1), snapshot.TargetLoadMin);
+                Assert.Equal(Math.Round(snapshot.CardioLoad.Value * 1.2m, 1), snapshot.TargetLoadMax);
             });
     }
 }

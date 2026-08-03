@@ -127,7 +127,7 @@ window.HealthCharts = (function () {
             });
         },
 
-        renderLoad(canvasId, labels, cardioLoadData, targetMinData, targetMaxData) {
+        renderLoad(canvasId, labels, cardioLoadData, targetMinData, targetMaxData, activeZoneMinutesData, manualAcwrData, activeZoneMinutesAcwrData) {
             if (charts[canvasId]) {
                 charts[canvasId].destroy();
             }
@@ -135,13 +135,16 @@ window.HealthCharts = (function () {
             if (!canvas) return;
 
             const hasCardioLoad = cardioLoadData.some(v => v !== null);
+            const hasActiveZoneMinutes = activeZoneMinutesData.some(v => v !== null);
             const hasTargetRange = targetMinData.some(v => v !== null) || targetMaxData.some(v => v !== null);
+            const hasManualAcwr = manualAcwrData.some(v => v !== null);
+            const hasActiveZoneMinutesAcwr = activeZoneMinutesAcwrData.some(v => v !== null);
             const colors = themeColors();
             const datasets = [];
 
             if (hasTargetRange) {
                 datasets.push({
-                    label: "Local AZM target min",
+                    label: "Manual target min",
                     data: targetMinData,
                     type: "line",
                     borderColor: "rgba(25, 135, 84, 0)",
@@ -153,7 +156,7 @@ window.HealthCharts = (function () {
                     yAxisID: "yLoad"
                 });
                 datasets.push({
-                    label: "Local AZM target range",
+                    label: "Manual target range",
                     data: targetMaxData,
                     type: "line",
                     borderColor: "rgba(25, 135, 84, 0.7)",
@@ -168,13 +171,51 @@ window.HealthCharts = (function () {
 
             if (hasCardioLoad) {
                 datasets.push({
-                    label: "Active Zone Minutes (AZM)",
+                    label: "Manual Cardio Load",
                     data: cardioLoadData,
+                    type: "bar",
+                    backgroundColor: "rgba(111, 66, 193, 0.62)",
+                    borderColor: "rgb(111, 66, 193)",
+                    borderWidth: 1,
+                    yAxisID: "yLoad"
+                });
+            }
+
+            if (hasActiveZoneMinutes) {
+                datasets.push({
+                    label: "Active Zone Minutes (AZM)",
+                    data: activeZoneMinutesData,
                     type: "bar",
                     backgroundColor: "rgba(13, 110, 253, 0.62)",
                     borderColor: "rgb(13, 110, 253)",
                     borderWidth: 1,
                     yAxisID: "yLoad"
+                });
+            }
+
+            if (hasManualAcwr) {
+                datasets.push({
+                    label: "Manual ACWR",
+                    data: manualAcwrData,
+                    type: "line",
+                    borderColor: "rgb(220, 53, 69)",
+                    backgroundColor: "rgba(220, 53, 69, 0.08)",
+                    tension: 0.3,
+                    spanGaps: true,
+                    yAxisID: "yAcwr"
+                });
+            }
+
+            if (hasActiveZoneMinutesAcwr) {
+                datasets.push({
+                    label: "AZM ACWR",
+                    data: activeZoneMinutesAcwrData,
+                    type: "line",
+                    borderColor: "rgb(25, 135, 84)",
+                    backgroundColor: "rgba(25, 135, 84, 0.08)",
+                    tension: 0.3,
+                    spanGaps: true,
+                    yAxisID: "yAcwr"
                 });
             }
 
@@ -189,7 +230,7 @@ window.HealthCharts = (function () {
                             position: "top",
                             labels: {
                                 color: colors.text,
-                                filter: item => item.text !== "Local AZM target min"
+                                filter: item => item.text !== "Manual target min"
                             }
                         },
                         tooltip: {
@@ -211,9 +252,18 @@ window.HealthCharts = (function () {
                             type: "linear",
                             position: "left",
                             beginAtZero: true,
-                            title: { display: true, text: "Active Zone Minutes (AZM)", color: colors.muted },
+                            title: { display: true, text: "Load / Active Zone Minutes", color: colors.muted },
                             ticks: { color: colors.muted },
                             grid: { color: colors.grid },
+                            border: { color: colors.grid }
+                        },
+                        yAcwr: {
+                            type: "linear",
+                            position: "right",
+                            beginAtZero: true,
+                            title: { display: true, text: "ACWR", color: colors.muted },
+                            ticks: { color: colors.muted },
+                            grid: { drawOnChartArea: false, color: colors.grid },
                             border: { color: colors.grid }
                         }
                     }

@@ -40,23 +40,22 @@ HealthMetrics.Tests
 5. The service merges results into `daily_metric_snapshots` using
    `(UserKey, MetricDate)` idempotency and never replaces an existing provider
    value with a null from a partial response.
-6. After the merge is saved, `TargetLoadCalculator` recalculates local AZM
-   reference ranges and `AcwrCalculator` recalculates persisted ratios from
-   local AZM history. The target calculator requires 7 consecutive values and
-   uses up to 28; ACWR clears ratios whose complete 7/28-day windows are no
-   longer available.
+6. After the merge is saved, `AcwrCalculator` recalculates both persisted ratios
+   independently: `Acwr` from manual `CardioLoad` and `ActiveZoneMinutesAcwr`
+   from synced `ActiveZoneMinutes`. A ratio clears when its own complete 7/28-day
+   windows are unavailable. Sync never changes the manual Cardio Load or target
+   fields.
 7. `sync_history` records requested days, persisted days, duration, outcome, and
    sanitized errors.
 
 ## Dashboard and derived metrics
 
 `MetricQueryService` returns local snapshots to the interactive Home component.
-The page derives the latest local AZM reference display and ACWR status badge
-from the persisted fields. The table exposes sortable AZM, local target range,
-ACWR, and sleep-efficiency columns with `—` fallbacks. Chart.js keeps the
-existing Heart & HRV view separate from the AZM & Training Strain view; the
-latter uses Active Zone Minutes bars plus two line datasets whose fill creates
-the local reference band.
+`ManualLoadEntryService` validates nullable user-entered manual Cardio Load and
+targets, preserves synced fields, and recalculates only the manual ratio. The
+table exposes separate manual and AZM values and ratios with `—` fallbacks.
+Chart.js keeps Heart & HRV separate from the load view, which uses manual bars
+and a manual target band, AZM bars, and both ratios on the right axis.
 The CSV endpoint exports the persisted source and derived values, including
 deep/REM minutes, with invariant-culture numeric formatting.
 

@@ -143,6 +143,39 @@ public sealed class HealthMetricsDbContextTests
         Assert.Equal(0, await ScalarAsync<long>(connection, "SELECT COUNT(*) FROM pragma_table_info('daily_metric_snapshots') WHERE name = 'FiberGrams'"));
     }
 
+    [Fact]
+    public async Task SeparateManualLoadAndAzmMigration_CopiesProviderLoadAndClearsRetiredAutomaticFields()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<HealthMetricsDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using (var legacyContext = new HealthMetricsDbContext(options))
+        {
+            var migrator = legacyContext.GetService<IMigrator>();
+            await migrator.MigrateAsync("20260803035901_AddCardioLoadAndSleepMetrics");
+            await legacyContext.Database.ExecuteSqlRawAsync("""
+                INSERT INTO daily_metric_snapshots (
+                    UserKey, MetricDate, CardioLoad, TargetLoadMin, TargetLoadMax, Acwr, CapturedAtUtc
+                ) VALUES (
+                    'local-user', '2026-08-02', 82.0, 60.0, 90.0, 1.05, '2026-08-03T00:00:00+00:00'
+                );
+                """);
+            await migrator.MigrateAsync();
+        }
+
+        await using var migratedContext = new HealthMetricsDbContext(options);
+        var snapshot = await migratedContext.DailyMetricSnapshots.SingleAsync();
+        Assert.Equal(82m, snapshot.ActiveZoneMinutes);
+        Assert.Equal(1.05m, snapshot.ActiveZoneMinutesAcwr);
+        Assert.Null(snapshot.CardioLoad);
+        Assert.Null(snapshot.TargetLoadMin);
+        Assert.Null(snapshot.TargetLoadMax);
+        Assert.Null(snapshot.Acwr);
+    }
+
     private static string LegacyConnectionTable => "fit" + "bit_connections";
 
     private static string LegacyUserIdColumn => "Fit" + "bitUserId";

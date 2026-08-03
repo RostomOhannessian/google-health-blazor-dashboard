@@ -103,8 +103,9 @@ public sealed class GoogleHealthSyncServiceTests : IAsyncLifetime
         Assert.Equal(46.0m, stored.DailyVo2MaxMlKgMin);
         Assert.Equal(47.0m, stored.RunVo2MaxMlKgMin);
         Assert.Equal(78m, stored.CardioLoad);
-        Assert.Null(stored.TargetLoadMin);
-        Assert.Null(stored.TargetLoadMax);
+        Assert.Equal(60m, stored.TargetLoadMin);
+        Assert.Equal(90m, stored.TargetLoadMax);
+        Assert.Null(stored.ActiveZoneMinutes);
         Assert.Equal(91m, stored.SleepEfficiency);
         Assert.Equal(85, stored.DeepSleepMinutes);
         Assert.Equal(105, stored.RemSleepMinutes);
@@ -151,9 +152,20 @@ public sealed class GoogleHealthSyncServiceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task SyncRecentDaysAsync_Merge_StoresCardioLoadAndSleepValues()
+    public async Task SyncRecentDaysAsync_Merge_StoresActiveZoneMinutesAndPreservesManualLoad()
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        _dbContext.DailyMetricSnapshots.Add(new DailyMetricSnapshot
+        {
+            MetricDate = today,
+            CardioLoad = 78m,
+            TargetLoadMin = 60m,
+            TargetLoadMax = 90m,
+            Acwr = 1.05m,
+            ActiveZoneMinutes = 70m
+        });
+        await _dbContext.SaveChangesAsync();
+
         var handler = new StubHandler(req =>
         {
             var path = req.RequestUri!.ToString();
@@ -209,23 +221,25 @@ public sealed class GoogleHealthSyncServiceTests : IAsyncLifetime
             NullLogger<GoogleHealthSyncService>.Instance).SyncRecentDaysAsync(1);
 
         var stored = await _dbContext.DailyMetricSnapshots.SingleAsync();
-        Assert.Equal(82m, stored.CardioLoad);
-        Assert.Null(stored.TargetLoadMin);
-        Assert.Null(stored.TargetLoadMax);
+        Assert.Equal(78m, stored.CardioLoad);
+        Assert.Equal(82m, stored.ActiveZoneMinutes);
+        Assert.Equal(60m, stored.TargetLoadMin);
+        Assert.Equal(90m, stored.TargetLoadMax);
         Assert.Equal(88m, stored.SleepEfficiency);
         Assert.Equal(70, stored.DeepSleepMinutes);
         Assert.Equal(100, stored.RemSleepMinutes);
     }
 
     [Fact]
-    public async Task SyncRecentDaysAsync_RecalculatesAcwrFromPersistedHistory()
+    public async Task SyncRecentDaysAsync_RecalculatesIndependentAcwrSeriesFromPersistedHistory()
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         _dbContext.DailyMetricSnapshots.AddRange(
             Enumerable.Range(0, 28).Select(offset => new DailyMetricSnapshot
             {
                 MetricDate = today.AddDays(-offset),
-                CardioLoad = 100m
+                CardioLoad = 100m,
+                ActiveZoneMinutes = 100m
             }));
         await _dbContext.SaveChangesAsync();
 
@@ -253,12 +267,17 @@ public sealed class GoogleHealthSyncServiceTests : IAsyncLifetime
 
         var stored = await _dbContext.DailyMetricSnapshots
             .SingleAsync(snapshot => snapshot.MetricDate == today);
-        Assert.Equal(1.01m, stored.Acwr);
-        Assert.Equal(80.29m, stored.TargetLoadMin);
-        Assert.Equal(120.43m, stored.TargetLoadMax);
+        Assert.Equal(1m, stored.Acwr);
+        Assert.Equal(1.01m, stored.ActiveZoneMinutesAcwr);
+        Assert.Null(stored.TargetLoadMin);
+        Assert.Null(stored.TargetLoadMax);
         Assert.All(
             await _dbContext.DailyMetricSnapshots.Where(snapshot => snapshot.MetricDate < today).ToListAsync(),
-            snapshot => Assert.Null(snapshot.Acwr));
+            snapshot =>
+            {
+                Assert.Null(snapshot.Acwr);
+                Assert.Null(snapshot.ActiveZoneMinutesAcwr);
+            });
     }
 
     [Fact]

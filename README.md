@@ -3,17 +3,17 @@
 Health Metrics is a .NET 10 Blazor Interactive Server dashboard that stores
 Google Health data in a local SQLite database. It supports Google OAuth,
 range-based sync, demo data, CSV export, sync history, and a light/dark theme.
-The dashboard tracks resting heart rate, HRV, VO2 Max, nutrition, daily Active
-Zone Minutes (AZM), local AZM reference ranges, sleep efficiency, deep/REM
-sleep, and a locally calculated acute-to-chronic workload ratio (ACWR)
-training-strain indicator.
+The dashboard tracks resting heart rate, HRV, VO2 Max, nutrition, Google Health
+daily Active Zone Minutes (AZM), manually entered proprietary Cardio Load and
+target ranges, sleep efficiency, deep/REM sleep, and separate locally calculated
+acute-to-chronic workload ratios (ACWRs) for the manual and AZM series.
 
-The home page includes Daily Active Zone Minutes and ACWR summary cards,
-sortable daily snapshot columns, and a separate **AZM & Training Strain** chart.
-The chart shows AZM bars with a local reference range shaded behind them; the
-existing Heart & HRV chart remains available as a separate view. Missing
-provider values remain `—` rather than being converted to zero. ACWR is shown
-only when all 7 acute and 28 chronic calendar days have AZM values.
+The home page includes a manual Cardio Load entry form, distinct manual and AZM
+summary cards, sortable daily snapshot columns, and a separate load chart. The
+chart shows manual Cardio Load bars with a user-entered target band, provider AZM
+bars, and both ratios on a right axis; Heart & HRV remains a separate view.
+Missing values remain `—` rather than being converted to zero. Each ACWR appears
+only when its own series has complete 7-day acute and 28-day chronic windows.
 See the [Google Health data contract](docs/google-health-data-contract.md) for
 payload mappings and the CSV field contract.
 

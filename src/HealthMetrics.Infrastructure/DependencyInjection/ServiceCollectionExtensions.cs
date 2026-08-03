@@ -67,6 +67,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IGoogleAuthAdapter, DefaultGoogleAuthAdapter>();
         services.AddScoped<IHealthSyncService, GoogleHealthSyncService>();
         services.AddScoped<IMetricQueryService, MetricQueryService>();
+        services.AddScoped<IManualLoadEntryService, ManualLoadEntryService>();
         services.AddScoped<IDemoSeedService, DemoSeedService>();
 
         services.AddHostedService<GoogleHealthDailySyncBackgroundService>();

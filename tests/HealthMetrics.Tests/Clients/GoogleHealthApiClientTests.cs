@@ -146,7 +146,8 @@ public sealed class GoogleHealthApiClientTests
         Assert.Equal(42.5m, snapshot.HrvRmssdMilliseconds);
         Assert.Equal(46.8m, snapshot.DailyVo2MaxMlKgMin);
         Assert.Equal(47.2m, snapshot.RunVo2MaxMlKgMin);
-        Assert.Equal(50m, snapshot.CardioLoad);
+        Assert.Null(snapshot.CardioLoad);
+        Assert.Equal(50m, snapshot.ActiveZoneMinutes);
         Assert.Equal(2200, snapshot.ConsumedCaloriesKcal);
         Assert.Equal(260.5m, snapshot.CarbohydratesGrams);
         Assert.Equal(70m, snapshot.FatGrams);
@@ -234,7 +235,8 @@ public sealed class GoogleHealthApiClientTests
             CancellationToken.None);
 
         var snapshot = Assert.Single(snapshots);
-        Assert.Equal(78m, snapshot.CardioLoad);
+        Assert.Null(snapshot.CardioLoad);
+        Assert.Equal(78m, snapshot.ActiveZoneMinutes);
         Assert.Null(snapshot.TargetLoadMin);
         Assert.Null(snapshot.TargetLoadMax);
         Assert.Equal(91m, snapshot.SleepEfficiency);
@@ -266,6 +268,7 @@ public sealed class GoogleHealthApiClientTests
         var snapshot = Assert.Single(snapshots);
         Assert.Equal(58, snapshot.RestingHeartRateBpm);
         Assert.Null(snapshot.CardioLoad);
+        Assert.Null(snapshot.ActiveZoneMinutes);
         Assert.Null(snapshot.TargetLoadMin);
         Assert.Null(snapshot.TargetLoadMax);
         Assert.DoesNotContain(

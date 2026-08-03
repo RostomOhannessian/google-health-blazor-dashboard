@@ -71,7 +71,7 @@ public sealed class HealthEndpointTests
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("text/csv", response.Content.Headers.ContentType!.MediaType);
-        Assert.StartsWith("Date,RestingHR_bpm,HRV_RMSSD_ms,DailyVO2Max_ml_kg_min,RunVO2Max_ml_kg_min,ActiveZoneMinutes,LocalAzmTargetMin,LocalAzmTargetMax,ACWR,SleepEfficiency_pct,DeepSleep_min,RemSleep_min,Calories_kcal,Carbs_g,Fat_g,Protein_g", csv);
+        Assert.StartsWith("Date,RestingHR_bpm,HRV_RMSSD_ms,DailyVO2Max_ml_kg_min,RunVO2Max_ml_kg_min,ManualCardioLoad,ManualTargetLoadMin,ManualTargetLoadMax,ManualACWR,ActiveZoneMinutes,ActiveZoneMinutesACWR,SleepEfficiency_pct,DeepSleep_min,RemSleep_min,Calories_kcal,Carbs_g,Fat_g,Protein_g", csv);
         Assert.DoesNotContain("Sodium", csv);
         Assert.DoesNotContain("Fiber", csv);
     }
@@ -92,7 +92,7 @@ public sealed class HealthEndpointTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var lines = csv.Split('\n', StringSplitOptions.RemoveEmptyEntries);
         foreach (var line in lines.Skip(1)) // skip header
-            Assert.Equal(16, line.TrimEnd('\r').Split(',').Length);
+            Assert.Equal(18, line.TrimEnd('\r').Split(',').Length);
 
         Assert.Contains("42.5", csv);
         Assert.Contains("260.5", csv);
@@ -148,13 +148,16 @@ public sealed class HealthEndpointTests
         Assert.Contains("260.50", html);
         Assert.Contains("70.00", html);
         Assert.Contains("120.00", html);
-        Assert.Contains("78.0 / Local range:", html);
+        Assert.Contains("78.0 / Target:", html);
         Assert.Contains("60.0", html);
         Assert.Contains("90.0", html);
         Assert.Contains("1.05", html);
         Assert.Contains("Optimal Zone", html);
-        Assert.Contains("Daily Active Zone Minutes (AZM)", html);
-        Assert.Contains("Local AZM Target", html);
+        Assert.Contains("Manual Cardio Load entry", html);
+        Assert.Contains("Manual Cardio Load", html);
+        Assert.Contains("Active Zone Minutes (AZM)", html);
+        Assert.Contains("Manual target", html);
+        Assert.Contains("AZM ACWR", html);
         Assert.Contains("Sleep Efficiency (%)", html);
     }
 
@@ -169,6 +172,22 @@ public sealed class HealthEndpointTests
         Assert.Contains("Connected · reconnect required", html);
         Assert.Contains("Reconnect to grant sleep access. Other metrics can still sync.", html);
         Assert.Contains("Reconnect for sleep", html);
+    }
+
+    [Fact]
+    public async Task Charts_ExposeDistinctManualAndProviderLoadSeries()
+    {
+        await using var factory = new HealthMetricsWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var script = await client.GetStringAsync("/charts.js");
+
+        Assert.Contains("Manual Cardio Load", script);
+        Assert.Contains("Active Zone Minutes (AZM)", script);
+        Assert.Contains("Manual target range", script);
+        Assert.Contains("Manual ACWR", script);
+        Assert.Contains("AZM ACWR", script);
+        Assert.Contains("yAcwr", script);
     }
 
     private sealed class HealthMetricsWebApplicationFactory : WebApplicationFactory<Program>
@@ -283,6 +302,8 @@ public sealed class HealthEndpointTests
                     TargetLoadMin = 60m,
                     TargetLoadMax = 90m,
                     Acwr = 1.05m,
+                    ActiveZoneMinutes = 82m,
+                    ActiveZoneMinutesAcwr = 1.08m,
                     SleepEfficiency = 91m,
                     DeepSleepMinutes = 85,
                     RemSleepMinutes = 105,

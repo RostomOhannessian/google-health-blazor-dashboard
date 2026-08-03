@@ -138,7 +138,7 @@
                         type="button"
                         aria-haspopup="dialog"
                         aria-controls="manual-load-modal"
-                        title="Valid changes save automatically while typing and when leaving a field."
+                        title="Enable optional autosave in the manual load popup."
                         @onclick="OpenManualLoadModal">
                     Enter or edit manual load
                 </button>
@@ -184,6 +184,14 @@
                     <EditForm Model="manualLoadForm" OnSubmit="SaveManualLoadAsync" FormName="manual-load-entry-form">
                         <fieldset aria-describedby="manual-load-help manual-load-autosave-help">
                             <legend class="visually-hidden">Manual load entry</legend>
+                            <div class="form-check mb-3">
+                                <input id="manual-load-autosave"
+                                       class="form-check-input"
+                                       type="checkbox"
+                                       @bind="manualAutoSaveEnabled"
+                                       @bind:after="HandleManualAutoSaveSettingChanged" />
+                                <label class="form-check-label" for="manual-load-autosave">Enable autosave</label>
+                            </div>
                             <div class="row g-3">
                                 <div class="col-12 col-md-4">
                                     <label class="form-label" for="manual-load-date">Date</label>
@@ -238,7 +246,7 @@
                                 </div>
                             </div>
                             <p class="form-text mb-3" id="manual-load-autosave-help">
-                                All load fields are optional. Valid changes save automatically while typing and when leaving a field. Values must be zero or greater; leave a field blank to clear it.
+                                Autosave is optional. When enabled, valid changes save automatically while typing and when leaving a field. Otherwise, use Save manual load. Values must be zero or greater; leave a field blank to clear it.
                             </p>
                             <div class="d-flex flex-wrap gap-2">
                                 <button class="btn btn-primary" type="submit" disabled="@isSavingManual">
@@ -452,6 +460,7 @@
     private string manualCardioLoadText = string.Empty;
     private string manualTargetLoadText = string.Empty;
     private CancellationTokenSource? manualAutoSaveCts;
+    private bool manualAutoSaveEnabled;
     private bool suppressNextManualAutoSave;
     private bool isConfirmingManualClear;
     private bool isManualLoadModalOpen;
@@ -691,7 +700,7 @@
 
     private async Task QueueManualLoadAutoSaveAsync(KeyboardEventArgs args)
     {
-        if (!isManualLoadModalOpen || !IsManualLoadEditKey(args))
+        if (!isManualLoadModalOpen || !manualAutoSaveEnabled || !IsManualLoadEditKey(args))
             return;
 
         CancelPendingManualAutoSave();
@@ -725,13 +734,22 @@
             return;
         }
 
+        if (!manualAutoSaveEnabled)
+        {
+            CancelPendingManualAutoSave();
+            return;
+        }
+
         CancelPendingManualAutoSave();
         await AutoSaveManualLoadAsync();
     }
 
     private async Task AutoSaveManualLoadAsync()
     {
-        if (!isManualLoadModalOpen || isSavingManual || !TryApplyManualLoadInputs())
+        if (!isManualLoadModalOpen
+            || !manualAutoSaveEnabled
+            || isSavingManual
+            || !TryApplyManualLoadInputs())
             return;
 
         if (!HasManualLoadChanges())
@@ -749,6 +767,12 @@
 
         cancellationSource.Cancel();
         cancellationSource.Dispose();
+    }
+
+    private void HandleManualAutoSaveSettingChanged()
+    {
+        if (!manualAutoSaveEnabled)
+            CancelPendingManualAutoSave();
     }
 
     private void SuppressNextManualLoadAutoSave(MouseEventArgs _)

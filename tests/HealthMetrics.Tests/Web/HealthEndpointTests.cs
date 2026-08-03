@@ -190,7 +190,7 @@ public sealed class HealthEndpointTests
         Assert.Contains("aria-haspopup=\"dialog\"", html);
         Assert.Contains("aria-controls=\"manual-load-modal\"", html);
         Assert.Contains("Enter or edit manual load", html);
-        Assert.Contains("Valid changes save automatically while typing and when leaving a field.", html);
+        Assert.Contains("Enable optional autosave in the manual load popup.", html);
         Assert.Contains(">YTD<", html);
         Assert.Contains("Year to date (since January 1)", html);
     }

@@ -361,6 +361,12 @@
 </div>
 <div class="table-responsive">
     <table class="table table-striped table-sm table-hover">
+        @if (metrics.Count > 0 && !ShowsWeeklySummaries)
+        {
+            <caption class="caption-top py-1 text-muted">
+                Weekly summaries are shown when sorted by date.
+            </caption>
+        }
         <thead>
             <tr>
                 <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("date"))">Date @SortIndicator("date")</button></th>
@@ -423,25 +429,28 @@
                             <td>@Display(metric.ProteinGrams, "F2")</td>
                         </tr>
                     }
-                    <tr class="weekly-summary-row">
-                        <th scope="row"
-                            class="weekly-summary-label"
-                            title="Weekly summary of the recorded values for this Monday-Sunday week">
-                            @WeeklySummaryLabel(weeklyGroup.WeekStart)
-                        </th>
-                        <td class="border-start">@Display(weeklyGroup.Averages.RestingHeartRateBpm, "F1")</td>
-                        <td>@Display(weeklyGroup.Averages.HrvRmssdMilliseconds, "F3")</td>
-                        <td class="border-start">@Display(weeklyGroup.Averages.DailyVo2MaxMlKgMin, "F1")</td>
-                        <td>@Display(weeklyGroup.Averages.RunVo2MaxMlKgMin, "F1")</td>
-                        <td class="border-start">@Display(weeklyGroup.Averages.CardioLoadTotal, "F1")</td>
-                        <td>@Display(weeklyGroup.Averages.TargetLoad, "F1")</td>
-                        <td>@Display(weeklyGroup.Averages.Acwr, "F2")</td>
-                        <td class="border-start">@Display(weeklyGroup.Averages.SleepEfficiency, "F2")</td>
-                        <td class="border-start">@Display(weeklyGroup.Averages.ConsumedCaloriesKcal, "F1")</td>
-                        <td>@Display(weeklyGroup.Averages.CarbohydratesGrams, "F2")</td>
-                        <td>@Display(weeklyGroup.Averages.FatGrams, "F2")</td>
-                        <td>@Display(weeklyGroup.Averages.ProteinGrams, "F2")</td>
-                    </tr>
+                    @if (ShowsWeeklySummaries)
+                    {
+                        <tr class="weekly-summary-row">
+                            <th scope="row"
+                                class="weekly-summary-label"
+                                title="Weekly summary of the recorded values for this Monday-Sunday week">
+                                @WeeklySummaryLabel(weeklyGroup.WeekStart)
+                            </th>
+                            <td class="border-start">@Display(weeklyGroup.Averages.RestingHeartRateBpm, "F1")</td>
+                            <td>@Display(weeklyGroup.Averages.HrvRmssdMilliseconds, "F3")</td>
+                            <td class="border-start">@Display(weeklyGroup.Averages.DailyVo2MaxMlKgMin, "F1")</td>
+                            <td>@Display(weeklyGroup.Averages.RunVo2MaxMlKgMin, "F1")</td>
+                            <td class="border-start">@Display(weeklyGroup.Averages.CardioLoadTotal, "F1")</td>
+                            <td>@Display(weeklyGroup.Averages.TargetLoad, "F1")</td>
+                            <td>@Display(weeklyGroup.Averages.Acwr, "F2")</td>
+                            <td class="border-start">@Display(weeklyGroup.Averages.SleepEfficiency, "F2")</td>
+                            <td class="border-start">@Display(weeklyGroup.Averages.ConsumedCaloriesKcal, "F1")</td>
+                            <td>@Display(weeklyGroup.Averages.CarbohydratesGrams, "F2")</td>
+                            <td>@Display(weeklyGroup.Averages.FatGrams, "F2")</td>
+                            <td>@Display(weeklyGroup.Averages.ProteinGrams, "F2")</td>
+                        </tr>
+                    }
                 }
             }
         </tbody>
@@ -583,6 +592,8 @@
 
     private IEnumerable<WeeklyMetricGroup> WeeklyMetricGroups =>
         GroupWeeklyMetrics(SortedMetrics);
+
+    private bool ShowsWeeklySummaries => sortColumn == "date";
 
     protected override async Task OnInitializedAsync()
     {

@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using HealthMetrics.Application.Exceptions;
 using HealthMetrics.Application.Interfaces;
+using HealthMetrics.Application.Models;
 using HealthMetrics.Infrastructure.DependencyInjection;
 using HealthMetrics.Infrastructure.Persistence;
 using HealthMetrics.Web.Security;
@@ -173,13 +174,18 @@ try
         IMetricQueryService metricQueryService,
         CancellationToken cancellationToken) =>
     {
-        var requestedDays = days is > 0 and <= 366 ? days.Value : 30;
-        var rangeEndDate = endDate ?? DateOnly.FromDateTime(DateTime.UtcNow);
+        var range = TryGetMetricDateRange(days, endDate, 30);
+        if (range is null)
+        {
+            endpointLogger.LogWarning("Metrics query rejected because the requested date range is invalid.");
+            return Results.BadRequest("The requested date range must end today or earlier and cannot begin before January 1, 0001.");
+        }
+
         var metrics = await metricQueryService.GetMetricsAsync(
-            rangeEndDate.AddDays(1 - requestedDays),
-            rangeEndDate,
+            range.StartDate,
+            range.EndDate,
             cancellationToken);
-        endpointLogger.LogInformation("Metrics query completed for {RequestedDays} day(s). Returned {MetricCount} row(s).", requestedDays, metrics.Count);
+        endpointLogger.LogInformation("Metrics query completed for {RequestedDays} day(s). Returned {MetricCount} row(s).", range.DayCount, metrics.Count);
         return Results.Ok(metrics);
     });
 
@@ -189,11 +195,16 @@ try
         IMetricQueryService metricQueryService,
         CancellationToken cancellationToken) =>
     {
-        var requestedDays = days is > 0 and <= 366 ? days.Value : 366;
-        var rangeEndDate = endDate ?? DateOnly.FromDateTime(DateTime.UtcNow);
+        var range = TryGetMetricDateRange(days, endDate, 366);
+        if (range is null)
+        {
+            endpointLogger.LogWarning("Metrics CSV export rejected because the requested date range is invalid.");
+            return Results.BadRequest("The requested date range must end today or earlier and cannot begin before January 1, 0001.");
+        }
+
         var metrics = await metricQueryService.GetMetricsAsync(
-            rangeEndDate.AddDays(1 - requestedDays),
-            rangeEndDate,
+            range.StartDate,
+            range.EndDate,
             cancellationToken);
 
         var sb = new StringBuilder();
@@ -204,10 +215,10 @@ try
                 $"{m.MetricDate:yyyy-MM-dd},{m.RestingHeartRateBpm},{m.HrvRmssdMilliseconds},{m.DailyVo2MaxMlKgMin},{m.RunVo2MaxMlKgMin},{m.CardioLoad},{m.TargetLoad},{m.Acwr},{m.SleepEfficiency},{m.DeepSleepMinutes},{m.RemSleepMinutes},{m.ConsumedCaloriesKcal},{m.CarbohydratesGrams},{m.FatGrams},{m.ProteinGrams}"));
         }
 
-        var filename = $"health-metrics-{rangeEndDate:yyyy-MM-dd}.csv";
+        var filename = $"health-metrics-{range.EndDate:yyyy-MM-dd}.csv";
         endpointLogger.LogInformation(
             "Metrics CSV export generated for {RequestedDays} day(s). Exported {MetricCount} row(s) to {FileName}.",
-            requestedDays,
+            range.DayCount,
             metrics.Count,
             filename);
         return Results.File(Encoding.UTF8.GetBytes(sb.ToString()), "text/csv", filename);
@@ -226,5 +237,17 @@ finally
 }
 
 static string GetStateCacheKey(string state) => $"google-health-oauth-state:{state}";
+
+static MetricDateRange? TryGetMetricDateRange(int? days, DateOnly? endDate, int defaultDayCount)
+{
+    var requestedDays = days is > 0 and <= 366 ? days.Value : defaultDayCount;
+    var today = DateOnly.FromDateTime(DateTime.UtcNow);
+    var rangeEndDate = endDate ?? today;
+
+    if (rangeEndDate > today || rangeEndDate.DayNumber < requestedDays - 1)
+        return null;
+
+    return new MetricDateRange(rangeEndDate.AddDays(1 - requestedDays), rangeEndDate);
+}
 
 public partial class Program;

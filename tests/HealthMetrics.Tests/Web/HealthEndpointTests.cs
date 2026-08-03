@@ -101,6 +101,37 @@ public sealed class HealthEndpointTests
         Assert.Contains("78", csv);
     }
 
+    [Theory]
+    [InlineData("/api/metrics?days=30&endDate=0001-01-01")]
+    [InlineData("/api/metrics?days=1&endDate=9999-12-31")]
+    [InlineData("/api/metrics/export?days=366&endDate=0001-01-01")]
+    [InlineData("/api/metrics/export?days=1&endDate=9999-12-31")]
+    public async Task MetricsEndpoints_RejectInvalidDateRanges(string path)
+    {
+        await using var factory = new HealthMetricsWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var response = await client.GetAsync(path);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Metrics_UsesRequestedDateRange()
+    {
+        var endDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-7);
+        await using var factory = new HealthMetricsWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var response = await client.GetAsync($"/api/metrics?days=7&endDate={endDate:yyyy-MM-dd}");
+        var queryService = Assert.IsType<FakeMetricQueryService>(
+            factory.Services.GetRequiredService<IMetricQueryService>());
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(endDate.AddDays(-6), queryService.LastStartDate);
+        Assert.Equal(endDate, queryService.LastEndDate);
+    }
+
     [Fact]
     public async Task RootDocument_ReferencesResolvableScopedStylesheet()
     {
@@ -380,14 +411,21 @@ public sealed class HealthEndpointTests
 
     private sealed class FakeMetricQueryService(bool includeOlderMetric) : IMetricQueryService
     {
+        public DateOnly? LastStartDate { get; private set; }
+        public DateOnly? LastEndDate { get; private set; }
+
         public Task<IReadOnlyList<DailyMetricSnapshot>> GetRecentMetricsAsync(int dayCount, CancellationToken cancellationToken = default) =>
             GetFakeMetrics();
 
         public Task<IReadOnlyList<DailyMetricSnapshot>> GetMetricsAsync(
             DateOnly startDate,
             DateOnly endDate,
-            CancellationToken cancellationToken = default) =>
-            GetFakeMetrics();
+            CancellationToken cancellationToken = default)
+        {
+            LastStartDate = startDate;
+            LastEndDate = endDate;
+            return GetFakeMetrics();
+        }
 
         private Task<IReadOnlyList<DailyMetricSnapshot>> GetFakeMetrics() =>
             Task.FromResult<IReadOnlyList<DailyMetricSnapshot>>(

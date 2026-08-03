@@ -6,7 +6,7 @@ public sealed record WeeklyMetricAverages(
     decimal? HrvRmssdMilliseconds,
     decimal? DailyVo2MaxMlKgMin,
     decimal? RunVo2MaxMlKgMin,
-    decimal? CardioLoad,
+    decimal? CardioLoadTotal,
     decimal? TargetLoad,
     decimal? Acwr,
     decimal? SleepEfficiency,
@@ -26,7 +26,7 @@ public sealed record WeeklyMetricAverages(
             Average(values.Select(snapshot => snapshot.HrvRmssdMilliseconds)),
             Average(values.Select(snapshot => snapshot.DailyVo2MaxMlKgMin)),
             Average(values.Select(snapshot => snapshot.RunVo2MaxMlKgMin)),
-            Average(values.Select(snapshot => snapshot.CardioLoad)),
+            Sum(values.Select(snapshot => snapshot.CardioLoad)),
             Average(values.Select(snapshot => snapshot.TargetLoad)),
             Average(values.Select(snapshot => snapshot.Acwr)),
             Average(values.Select(snapshot => snapshot.SleepEfficiency)),
@@ -44,5 +44,15 @@ public sealed record WeeklyMetricAverages(
             .ToList();
 
         return nonNullValues.Count == 0 ? null : nonNullValues.Average();
+    }
+
+    private static decimal? Sum(IEnumerable<decimal?> values)
+    {
+        var nonNullValues = values
+            .Where(value => value.HasValue)
+            .Select(value => value.GetValueOrDefault())
+            .ToList();
+
+        return nonNullValues.Count == 0 ? null : nonNullValues.Sum();
     }
 }

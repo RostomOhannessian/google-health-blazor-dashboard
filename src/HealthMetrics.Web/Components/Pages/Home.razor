@@ -426,14 +426,14 @@
                     <tr class="weekly-summary-row">
                         <th scope="row"
                             class="weekly-summary-label"
-                            title="Average of the recorded values for this Monday-Sunday week">
+                            title="Weekly summary of the recorded values for this Monday-Sunday week">
                             @WeeklySummaryLabel(weeklyGroup.WeekStart)
                         </th>
                         <td class="border-start">@Display(weeklyGroup.Averages.RestingHeartRateBpm, "F1")</td>
                         <td>@Display(weeklyGroup.Averages.HrvRmssdMilliseconds, "F3")</td>
                         <td class="border-start">@Display(weeklyGroup.Averages.DailyVo2MaxMlKgMin, "F1")</td>
                         <td>@Display(weeklyGroup.Averages.RunVo2MaxMlKgMin, "F1")</td>
-                        <td class="border-start">@Display(weeklyGroup.Averages.CardioLoad, "F1")</td>
+                        <td class="border-start">@Display(weeklyGroup.Averages.CardioLoadTotal, "F1")</td>
                         <td>@Display(weeklyGroup.Averages.TargetLoad, "F1")</td>
                         <td>@Display(weeklyGroup.Averages.Acwr, "F2")</td>
                         <td class="border-start">@Display(weeklyGroup.Averages.SleepEfficiency, "F2")</td>
@@ -1077,7 +1077,7 @@
     }
 
     private static string WeeklySummaryLabel(DateOnly weekStart) =>
-        $"Week of {weekStart.ToString("MMM d", CultureInfo.CurrentCulture)} - {weekStart.AddDays(6).ToString("MMM d", CultureInfo.CurrentCulture)} average";
+        $"Week of {weekStart.ToString("MMM d", CultureInfo.CurrentCulture)} - {weekStart.AddDays(6).ToString("MMM d", CultureInfo.CurrentCulture)}";
 
     private string SortIndicator(string column) =>
         sortColumn == column ? (sortDescending ? "▼" : "▲") : string.Empty;

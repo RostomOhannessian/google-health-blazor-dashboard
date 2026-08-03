@@ -8,7 +8,7 @@ public sealed class WeeklyMetricAveragesTests
     public void From_AveragesRecordedValuesAndIgnoresMissingValues()
     {
         var weekStart = new DateOnly(2026, 8, 3);
-        var averages = WeeklyMetricAverages.From(
+        var summary = WeeklyMetricAverages.From(
             weekStart,
             [
                 new DailyMetricSnapshot
@@ -41,27 +41,27 @@ public sealed class WeeklyMetricAveragesTests
                 }
             ]);
 
-        Assert.Equal(weekStart, averages.WeekStart);
-        Assert.Equal(62m, averages.RestingHeartRateBpm);
-        Assert.Equal(40m, averages.HrvRmssdMilliseconds);
-        Assert.Equal(46m, averages.DailyVo2MaxMlKgMin);
-        Assert.Equal(75m, averages.CardioLoad);
-        Assert.Equal(500m, averages.TargetLoad);
-        Assert.Equal(85m, averages.SleepEfficiency);
-        Assert.Equal(2100m, averages.ConsumedCaloriesKcal);
-        Assert.Equal(250m, averages.CarbohydratesGrams);
+        Assert.Equal(weekStart, summary.WeekStart);
+        Assert.Equal(62m, summary.RestingHeartRateBpm);
+        Assert.Equal(40m, summary.HrvRmssdMilliseconds);
+        Assert.Equal(46m, summary.DailyVo2MaxMlKgMin);
+        Assert.Equal(150m, summary.CardioLoadTotal);
+        Assert.Equal(500m, summary.TargetLoad);
+        Assert.Equal(85m, summary.SleepEfficiency);
+        Assert.Equal(2100m, summary.ConsumedCaloriesKcal);
+        Assert.Equal(250m, summary.CarbohydratesGrams);
     }
 
     [Fact]
     public void From_ReturnsNullForMetricsWithoutRecordedValues()
     {
-        var averages = WeeklyMetricAverages.From(
+        var summary = WeeklyMetricAverages.From(
             new DateOnly(2026, 8, 3),
             [new DailyMetricSnapshot()]);
 
-        Assert.Null(averages.RestingHeartRateBpm);
-        Assert.Null(averages.HrvRmssdMilliseconds);
-        Assert.Null(averages.CardioLoad);
-        Assert.Null(averages.ProteinGrams);
+        Assert.Null(summary.RestingHeartRateBpm);
+        Assert.Null(summary.HrvRmssdMilliseconds);
+        Assert.Null(summary.CardioLoadTotal);
+        Assert.Null(summary.ProteinGrams);
     }
 }

@@ -158,9 +158,7 @@ public sealed class HealthEndpointTests
         Assert.Contains("Cardio Load (Manual)", html);
         Assert.Contains("Target Load (Manual)", html);
         Assert.Contains(">ACWR", html);
-        Assert.Contains("Manual Cardio Load and Weekly Target Load", html);
         Assert.Contains("Manual Cardio Load", html);
-        Assert.Contains("Weekly Target (load points)", html);
         Assert.Contains("Sleep Efficiency (%)", html);
     }
 
@@ -180,26 +178,19 @@ public sealed class HealthEndpointTests
     }
 
     [Fact]
-    public async Task HomePage_ManualLoadForm_UsesAccessibleDecimalInputsAndExplainsDataOwnership()
+    public async Task HomePage_ManualLoadEntry_UsesAccessibleModalTrigger()
     {
         await using var factory = new HealthMetricsWebApplicationFactory();
         var client = factory.CreateClient();
 
         var html = await client.GetStringAsync("/");
 
-        Assert.Contains("manual-load-entry-form", html);
-        Assert.Contains("<fieldset", html);
-        Assert.Contains("Manual load entry", html);
-        Assert.Contains("Cardio Load (load points)", html);
-        Assert.Contains("Weekly Target (load points)", html);
+        Assert.Contains("manual-load-entry-trigger", html);
+        Assert.Contains("aria-haspopup=\"dialog\"", html);
+        Assert.Contains("aria-controls=\"manual-load-modal\"", html);
+        Assert.Contains("Enter or edit manual load", html);
         Assert.Contains(">YTD<", html);
         Assert.Contains("Year to date (since January 1)", html);
-        Assert.Contains("min=\"0\"", html);
-        Assert.Contains("step=\"0.1\"", html);
-        Assert.Contains("inputmode=\"decimal\"", html);
-        Assert.Contains("manual-target-help", html);
-        Assert.Contains("Clear saved values", html);
-        Assert.Contains("the values drive the Manual Cardio ACWR calculation only", html);
     }
 
     [Fact]

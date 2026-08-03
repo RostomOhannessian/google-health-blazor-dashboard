@@ -131,7 +131,14 @@
                 <h6 class="card-subtitle text-muted mb-1">Manual Cardio Load</h6>
                 <p class="card-text fw-semibold mb-0">@CardioLoadText(summary)</p>
                 <small class="text-muted d-block">Proprietary, user-entered load and weekly target</small>
-                <a class="small" href="#manual-load-entry">Enter or edit manual load</a>
+                <button id="manual-load-entry-trigger"
+                        class="btn btn-link p-0 small"
+                        type="button"
+                        aria-haspopup="dialog"
+                        aria-controls="manual-load-modal"
+                        @onclick="OpenManualLoadModal">
+                    Enter or edit manual load
+                </button>
             </div>
         </div>
     </div>
@@ -152,94 +159,111 @@
     </div>
 </div>
 
-<section class="card mb-4" id="manual-load-entry" aria-labelledby="manual-load-entry-heading" tabindex="-1">
-    <div class="card-header">
-        <h2 class="h5 mb-0" id="manual-load-entry-heading">Manual Cardio Load and Weekly Target Load</h2>
-    </div>
-    <div class="card-body">
-        <p class="mb-3" id="manual-load-help">
-            Record proprietary manual Cardio Load and a weekly Target Load. Weeks run Monday through Sunday, and the values drive the Manual Cardio ACWR calculation only.
-        </p>
-        <EditForm Model="manualLoadForm" OnSubmit="SaveManualLoadAsync" FormName="manual-load-entry-form">
-            <fieldset aria-describedby="manual-load-help">
-                <legend class="fs-6 mb-3">Manual load entry</legend>
-                <div class="row g-3">
-                    <div class="col-12 col-md-4 col-xl-3">
-                        <label class="form-label" for="manual-load-date">Date</label>
-                        <InputDate id="manual-load-date"
-                                   class="form-control"
-                                   @bind-Value="manualLoadForm.MetricDate"
-                                   @bind-Value:after="LoadManualInputsForSelectedDate"
-                                   aria-describedby="manual-load-date-help" />
-                        <div class="form-text" id="manual-load-date-help">Choose the day to update.</div>
-                    </div>
-                    <div class="col-12 col-md-4 col-xl-3">
-                        <label class="form-label" for="manual-cardio-load">Cardio Load (load points)</label>
-                        <InputNumber id="manual-cardio-load"
-                                     class="form-control"
-                                     @bind-Value="manualLoadForm.CardioLoad"
-                                     min="0"
-                                     step="0.1"
-                                     inputmode="decimal"
-                                     aria-describedby="manual-cardio-load-help" />
-                        <div class="form-text" id="manual-cardio-load-help">Optional proprietary daily load.</div>
-                    </div>
-                    <div class="col-12 col-md-4 col-xl-3">
-                        <label class="form-label" for="manual-target">Weekly Target (load points)</label>
-                        <InputNumber id="manual-target"
-                                     class="form-control"
-                                     @bind-Value="manualLoadForm.TargetLoad"
-                                     min="0"
-                                     step="0.1"
-                                     inputmode="decimal"
-                                     aria-describedby="manual-target-help" />
-                        <div class="form-text" id="manual-target-help">Optional Monday–Sunday target amount.</div>
-                    </div>
+@if (isManualLoadModalOpen)
+{
+    <div class="modal fade show d-block"
+         id="manual-load-modal"
+         tabindex="-1"
+         role="dialog"
+         aria-modal="true"
+         aria-labelledby="manual-load-modal-heading"
+         aria-describedby="manual-load-help"
+         @onkeydown="HandleManualLoadModalKeyDown"
+         @onclick="CloseManualLoadModal">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg" role="document" @onclick:stopPropagation="true">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 class="modal-title h5 mb-0" id="manual-load-modal-heading">Manual Cardio Load and Weekly Target Load</h2>
+                    <button class="btn-close" type="button" aria-label="Close" autofocus @onclick="CloseManualLoadModal" disabled="@isSavingManual"></button>
                 </div>
-                <p class="form-text mb-3">
-                    All load fields are optional. Leave a value blank and save to clear that existing manual value.
-                </p>
-                <div class="d-flex flex-wrap gap-2">
-                    <button class="btn btn-primary" type="submit" disabled="@isSavingManual">
-                        @(isSavingManual ? "Saving…" : "Save manual load")
-                    </button>
-                    <button class="btn btn-outline-secondary" type="button" @onclick="ResetManualLoadInputs" disabled="@isSavingManual">
-                        Reset unsaved changes
-                    </button>
-                    <button class="btn btn-outline-danger" type="button" @onclick="BeginManualLoadClear" disabled="@isSavingManual">
-                        Clear saved values
-                    </button>
-                </div>
-            </fieldset>
-        </EditForm>
-        @if (isConfirmingManualClear)
-        {
-            <div class="alert alert-warning mt-3 mb-0" role="alert" id="manual-load-clear-confirmation">
-                <p class="mb-2">
-                    Clear the saved manual Cardio Load for @manualLoadForm.MetricDate.ToString("MMMM d, yyyy") and the weekly Target Load for the week starting @WeeklyLoadCalculator.GetWeekStart(manualLoadForm.MetricDate).ToString("MMMM d, yyyy")?
-                    Other saved health metrics will not be changed.
-                </p>
-                <div class="d-flex flex-wrap gap-2">
-                    <button class="btn btn-danger" type="button" @onclick="ClearManualLoadAsync" disabled="@isSavingManual">
-                        Yes, clear saved values
-                    </button>
-                    <button class="btn btn-outline-secondary" type="button" @onclick="CancelManualLoadClear" disabled="@isSavingManual">
-                        Cancel
-                    </button>
+                <div class="modal-body">
+                    <p class="mb-3" id="manual-load-help">
+                        Record proprietary manual Cardio Load and a weekly Target Load. Weeks run Monday through Sunday, and the values drive the Manual Cardio ACWR calculation only.
+                    </p>
+                    <EditForm Model="manualLoadForm" OnSubmit="SaveManualLoadAsync" FormName="manual-load-entry-form">
+                        <fieldset aria-describedby="manual-load-help">
+                            <legend class="visually-hidden">Manual load entry</legend>
+                            <div class="row g-3">
+                                <div class="col-12 col-md-4">
+                                    <label class="form-label" for="manual-load-date">Date</label>
+                                    <InputDate id="manual-load-date"
+                                               class="form-control"
+                                               @bind-Value="manualLoadForm.MetricDate"
+                                               @bind-Value:after="LoadManualInputsForSelectedDate"
+                                               aria-describedby="manual-load-date-help" />
+                                    <div class="form-text" id="manual-load-date-help">Choose the day to update.</div>
+                                </div>
+                                <div class="col-12 col-md-4">
+                                    <label class="form-label" for="manual-cardio-load">Cardio Load (load points)</label>
+                                    <InputNumber id="manual-cardio-load"
+                                                 class="form-control"
+                                                 @bind-Value="manualLoadForm.CardioLoad"
+                                                 min="0"
+                                                 step="0.1"
+                                                 inputmode="decimal"
+                                                 aria-describedby="manual-cardio-load-help" />
+                                    <div class="form-text" id="manual-cardio-load-help">Optional proprietary daily load.</div>
+                                </div>
+                                <div class="col-12 col-md-4">
+                                    <label class="form-label" for="manual-target">Weekly Target (load points)</label>
+                                    <InputNumber id="manual-target"
+                                                 class="form-control"
+                                                 @bind-Value="manualLoadForm.TargetLoad"
+                                                 min="0"
+                                                 step="0.1"
+                                                 inputmode="decimal"
+                                                 aria-describedby="manual-target-help" />
+                                    <div class="form-text" id="manual-target-help">Optional Monday–Sunday target amount.</div>
+                                </div>
+                            </div>
+                            <p class="form-text mb-3">
+                                All load fields are optional. Leave a value blank and save to clear that existing manual value.
+                            </p>
+                            <div class="d-flex flex-wrap gap-2">
+                                <button class="btn btn-primary" type="submit" disabled="@isSavingManual">
+                                    @(isSavingManual ? "Saving…" : "Save manual load")
+                                </button>
+                                <button class="btn btn-outline-secondary" type="button" @onclick="ResetManualLoadInputs" disabled="@isSavingManual">
+                                    Reset unsaved changes
+                                </button>
+                                <button class="btn btn-outline-danger" type="button" @onclick="BeginManualLoadClear" disabled="@isSavingManual">
+                                    Clear saved values
+                                </button>
+                            </div>
+                        </fieldset>
+                    </EditForm>
+                    @if (isConfirmingManualClear)
+                    {
+                        <div class="alert alert-warning mt-3 mb-0" role="alert" id="manual-load-clear-confirmation">
+                            <p class="mb-2">
+                                Clear the saved manual Cardio Load for @manualLoadForm.MetricDate.ToString("MMMM d, yyyy") and the weekly Target Load for the week starting @WeeklyLoadCalculator.GetWeekStart(manualLoadForm.MetricDate).ToString("MMMM d, yyyy")?
+                                Other saved health metrics will not be changed.
+                            </p>
+                            <div class="d-flex flex-wrap gap-2">
+                                <button class="btn btn-danger" type="button" @onclick="ClearManualLoadAsync" disabled="@isSavingManual">
+                                    Yes, clear saved values
+                                </button>
+                                <button class="btn btn-outline-secondary" type="button" @onclick="CancelManualLoadClear" disabled="@isSavingManual">
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(manualEntryMessage))
+                    {
+                        <div class="alert @(manualEntryError ? "alert-danger" : "alert-success") mt-3 mb-0"
+                             role="@(manualEntryError ? "alert" : "status")"
+                             aria-live="@(manualEntryError ? "assertive" : "polite")"
+                             id="manual-load-feedback">
+                            @manualEntryMessage
+                        </div>
+                    }
                 </div>
             </div>
-        }
-        @if (!string.IsNullOrWhiteSpace(manualEntryMessage))
-        {
-            <div class="alert @(manualEntryError ? "alert-danger" : "alert-success") mt-3 mb-0"
-                 role="@(manualEntryError ? "alert" : "status")"
-                 aria-live="@(manualEntryError ? "assertive" : "polite")"
-                 id="manual-load-feedback">
-                @manualEntryMessage
-            </div>
-        }
+        </div>
     </div>
-</section>
+    <div class="modal-backdrop fade show"></div>
+}
 
 @if (HasHeartMetrics || HasLoadMetrics)
 {
@@ -386,6 +410,7 @@
     private string? manualEntryMessage;
     private readonly ManualLoadForm manualLoadForm = new(DateOnly.FromDateTime(DateTime.UtcNow));
     private bool isConfirmingManualClear;
+    private bool isManualLoadModalOpen;
     private MetricRange selectedRange = MetricRange.ThirtyDays;
     private bool chartNeedsRender;
     private ChartMode chartMode = ChartMode.Heart;
@@ -510,6 +535,29 @@
         {
             isSyncing = false;
         }
+    }
+
+    private void OpenManualLoadModal()
+    {
+        isManualLoadModalOpen = true;
+        isConfirmingManualClear = false;
+        manualEntryError = false;
+        manualEntryMessage = null;
+    }
+
+    private void CloseManualLoadModal()
+    {
+        if (isSavingManual)
+            return;
+
+        isManualLoadModalOpen = false;
+        isConfirmingManualClear = false;
+    }
+
+    private void HandleManualLoadModalKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key == "Escape")
+            CloseManualLoadModal();
     }
 
     private async Task LoadDataAsync()

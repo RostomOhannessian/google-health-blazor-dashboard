@@ -157,12 +157,31 @@ public sealed class HealthEndpointTests
         Assert.Contains("Sleep Efficiency (%)", html);
     }
 
+    [Fact]
+    public async Task RootDocument_WhenConnectionNeedsNewScopes_ShowsReconnectGuidance()
+    {
+        await using var factory = new HealthMetricsWebApplicationFactory(requiresReconnect: true);
+        var client = factory.CreateClient();
+
+        var html = await client.GetStringAsync("/");
+
+        Assert.Contains("Connected · reconnect required", html);
+        Assert.Contains("Reconnect to grant sleep access. Other metrics can still sync.", html);
+        Assert.Contains("Reconnect for sleep", html);
+    }
+
     private sealed class HealthMetricsWebApplicationFactory : WebApplicationFactory<Program>
     {
         private readonly bool useRealAuthorization;
+        private readonly bool requiresReconnect;
 
-        public HealthMetricsWebApplicationFactory(bool useRealAuthorization = false) =>
+        public HealthMetricsWebApplicationFactory(
+            bool useRealAuthorization = false,
+            bool requiresReconnect = false)
+        {
             this.useRealAuthorization = useRealAuthorization;
+            this.requiresReconnect = requiresReconnect;
+        }
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
@@ -201,7 +220,8 @@ public sealed class HealthEndpointTests
                 if (!useRealAuthorization)
                 {
                     services.RemoveAll<IHealthAuthorizationService>();
-                    services.AddSingleton<IHealthAuthorizationService, FakeHealthAuthorizationService>();
+                    services.AddSingleton<IHealthAuthorizationService>(
+                        new FakeHealthAuthorizationService(requiresReconnect));
                 }
                 services.AddSingleton<IHealthSyncService, FakeHealthSyncService>();
                 services.AddSingleton<IMetricQueryService, FakeMetricQueryService>();
@@ -210,7 +230,7 @@ public sealed class HealthEndpointTests
         }
     }
 
-    private sealed class FakeHealthAuthorizationService : IHealthAuthorizationService
+    private sealed class FakeHealthAuthorizationService(bool requiresReconnect) : IHealthAuthorizationService
     {
         public Task<Uri> BuildAuthorizationUriAsync(string state, CancellationToken cancellationToken = default) =>
             Task.FromResult(new Uri(
@@ -233,7 +253,8 @@ public sealed class HealthEndpointTests
                 "user@example.com",
                 DateTimeOffset.UtcNow.AddHours(1),
                 null,
-                DateTimeOffset.UtcNow.AddMinutes(-10)));
+                DateTimeOffset.UtcNow.AddMinutes(-10),
+                requiresReconnect));
 
         public Task DisconnectAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
     }

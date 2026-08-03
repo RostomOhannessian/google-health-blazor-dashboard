@@ -230,6 +230,58 @@ public sealed class GoogleHealthApiClientTests
     }
 
     [Fact]
+    public async Task FetchDailyMetricsAsync_UnsupportedOptionalLoadCandidates_DoNotFailCoreMetrics()
+    {
+        var handler = new StubHttpMessageHandler(request =>
+        {
+            var path = request.RequestUri!.ToString();
+            if (path.Contains("daily-resting-heart-rate"))
+                return Json("""{"dataPoints":[{"date":"2026-07-18","value":{"beatsPerMinute":58}}]}""");
+
+            if (path.Contains("daily-cardio-load") || path.Contains("daily-target-load"))
+                return Error(HttpStatusCode.BadRequest, "unsupported data type");
+
+            if (path.Contains("cardio-load"))
+                return Error(HttpStatusCode.NotFound, "not found");
+
+            if (path.Contains("training-load") || path.Contains("target-load"))
+                return Error(HttpStatusCode.Forbidden, "not authorized");
+
+            return Json("""{}""");
+        });
+
+        var snapshots = await CreateClient(handler).FetchDailyMetricsAsync(
+            "token",
+            new DateOnly(2026, 7, 18),
+            new DateOnly(2026, 7, 18),
+            CancellationToken.None);
+
+        var snapshot = Assert.Single(snapshots);
+        Assert.Equal(58, snapshot.RestingHeartRateBpm);
+        Assert.Null(snapshot.CardioLoad);
+        Assert.Null(snapshot.TargetLoadMin);
+        Assert.Null(snapshot.TargetLoadMax);
+    }
+
+    [Fact]
+    public async Task FetchDailyMetricsAsync_OptionalLoadServerFailureStillFailsTheFetch()
+    {
+        var handler = new StubHttpMessageHandler(request =>
+            request.RequestUri!.ToString().Contains("daily-cardio-load")
+                ? Error(HttpStatusCode.ServiceUnavailable, "temporary outage")
+                : Json("""{}"""));
+
+        var exception = await Assert.ThrowsAsync<GoogleHealthApiException>(
+            () => CreateClient(handler).FetchDailyMetricsAsync(
+                "token",
+                new DateOnly(2026, 7, 18),
+                new DateOnly(2026, 7, 18),
+                CancellationToken.None));
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, exception.StatusCode);
+    }
+
+    [Fact]
     public async Task FetchDailyMetricsAsync_ListFiltersUseExclusiveEndDate()
     {
         var handler = new StubHttpMessageHandler(request =>
@@ -439,6 +491,12 @@ public sealed class GoogleHealthApiClientTests
         new(HttpStatusCode.OK)
         {
             Content = new StringContent(json, System.Text.Encoding.UTF8, "application/json")
+        };
+
+    private static HttpResponseMessage Error(HttpStatusCode statusCode, string message) =>
+        new(statusCode)
+        {
+            Content = new StringContent($$"""{"error":"{{message}}"}""", System.Text.Encoding.UTF8, "application/json")
         };
 
     private sealed record CapturedRequest(HttpMethod Method, string Uri, string Body);

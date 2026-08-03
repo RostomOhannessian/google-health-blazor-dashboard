@@ -2,6 +2,7 @@ using System.Diagnostics;
 using HealthMetrics.Application.Interfaces;
 using HealthMetrics.Application.Models;
 using HealthMetrics.Infrastructure.Clients;
+using HealthMetrics.Infrastructure.Options;
 using HealthMetrics.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -51,6 +52,17 @@ internal sealed class GoogleHealthSyncService(
         try
         {
             var accessToken = await healthAuthorizationService.GetValidAccessTokenAsync(cancellationToken);
+            var connection = await dbContext.HealthConnections
+                .SingleOrDefaultAsync(item => item.UserKey == LocalUser.Key, cancellationToken);
+            var includeSleep = connection is null
+                || GoogleHealthScopes.Contains(connection.Scope, GoogleHealthScopes.SleepRead);
+
+            if (!includeSleep)
+            {
+                logger.LogWarning(
+                    "Google Health sleep metrics will be skipped because the stored connection does not include the sleep read scope. Reconnect to grant the new scope.");
+            }
+
             var endDate = DateOnly.FromDateTime(DateTime.UtcNow);
             var startDate = endDate.AddDays(-(dayCount - 1));
             logger.LogInformation(
@@ -59,7 +71,12 @@ internal sealed class GoogleHealthSyncService(
                 startDate,
                 endDate);
 
-            var fetchedSnapshots = await googleHealthApiClient.FetchDailyMetricsAsync(accessToken, startDate, endDate, cancellationToken);
+            var fetchedSnapshots = await googleHealthApiClient.FetchDailyMetricsAsync(
+                accessToken,
+                startDate,
+                endDate,
+                cancellationToken,
+                includeSleep);
             var persistedDays = 0;
             var insertedDays = 0;
             var updatedDays = 0;
@@ -98,9 +115,6 @@ internal sealed class GoogleHealthSyncService(
                     startDate,
                     endDate);
             }
-
-            var connection = await dbContext.HealthConnections
-                .SingleOrDefaultAsync(item => item.UserKey == LocalUser.Key, cancellationToken);
 
             if (connection is not null)
             {

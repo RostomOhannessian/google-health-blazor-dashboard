@@ -6,4 +6,5 @@ public sealed record HealthConnectionStatus(
     string? GoogleEmail,
     DateTimeOffset? AccessTokenExpiresAtUtc,
     DateTimeOffset? RefreshTokenExpiresAtUtc,
-    DateTimeOffset? LastSuccessfulSyncAtUtc);
+    DateTimeOffset? LastSuccessfulSyncAtUtc,
+    bool RequiresReconnect = false);

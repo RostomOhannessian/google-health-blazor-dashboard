@@ -10,7 +10,7 @@ The dashboard intentionally exposes only fields with a Google Health API source 
 | `HrvRmssdMilliseconds` | `daily-heart-rate-variability` | `list` | Daily RMSSD value in milliseconds when available. |
 | `DailyVo2MaxMlKgMin` | `daily-vo2-max` | `list` | Daily cardio-fitness VO2 Max in ml/kg/min. |
 | `RunVo2MaxMlKgMin` | `run-vo2-max` | `dailyRollUp` | Average daily rollup value. |
-| `CardioLoad` | `daily-cardio-load`, `cardio-load`, or `training-load` | `list` | Optional provider cardio/training load score. The client tries these candidate data types in order and skips a candidate when Google returns 404. |
+| `CardioLoad` | `daily-cardio-load`, `cardio-load`, or `training-load` | `list` | Optional provider cardio/training load score. The client tries these candidate data types in order. |
 | `TargetLoadMin` | `daily-target-load` or `target-load` | `list` | Lower bound from the provider target-load object or a direct min/recommended-min field. |
 | `TargetLoadMax` | `daily-target-load` or `target-load` | `list` | Upper bound from the provider target-load object or a direct max/recommended-max field. |
 | `SleepEfficiency` | `sleep` | `list` | Provider sleep efficiency, normalized to a percentage. When omitted, the client derives sleep minutes divided by sleep-period minutes. |
@@ -63,7 +63,11 @@ for the same missing values.
 The public Google discovery document used by this integration does not
 currently publish stable cardio-load, training-load, or target-load schemas.
 Those data types are therefore optional flexible candidates; the client keeps
-the field null when none is available. Sleep uses the documented `sleep`,
+the field null when none is available. Unsupported candidate responses (400 or
+404) advance to the next candidate; a candidate-specific 403 skips the optional
+metric without failing confirmed metrics. Authentication failures, throttling,
+and server errors still fail the fetch so operational problems are not hidden.
+Sleep uses the documented `sleep`,
 `SleepMetadata`, `SleepSummary`, `stagesSummary`, and `SleepStage` shapes.
 
 ## Removed legacy fields

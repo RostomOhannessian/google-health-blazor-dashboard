@@ -15,6 +15,8 @@ namespace HealthMetrics.Tests.Services;
 
 public sealed class GoogleHealthAuthorizationServiceTests : IAsyncLifetime
 {
+    private const string SleepReadScope = "https://www.googleapis.com/auth/googlehealth.sleep.readonly";
+
     private SqliteConnection _connection = null!;
     private HealthMetricsDbContext _dbContext = null!;
     private IDataProtectionProvider _dp = null!;
@@ -47,6 +49,7 @@ public sealed class GoogleHealthAuthorizationServiceTests : IAsyncLifetime
         Assert.False(status.IsConnected);
         Assert.Null(status.GoogleEmail);
         Assert.Null(status.GoogleUserId);
+        Assert.False(status.RequiresReconnect);
     }
 
     [Fact]
@@ -71,6 +74,27 @@ public sealed class GoogleHealthAuthorizationServiceTests : IAsyncLifetime
         Assert.Equal("user-123", status.GoogleUserId);
         Assert.Equal("user@example.com", status.GoogleEmail);
         Assert.NotNull(status.LastSuccessfulSyncAtUtc);
+        Assert.True(status.RequiresReconnect);
+    }
+
+    [Fact]
+    public async Task GetConnectionStatusAsync_WhenSleepScopeIsGranted_DoesNotRequireReconnect()
+    {
+        var protector = _dp.CreateProtector("HealthMetrics.GoogleTokens.v1");
+        _dbContext.HealthConnections.Add(new HealthConnection
+        {
+            GoogleUserId = "user-123",
+            AccessToken = protector.Protect("at"),
+            RefreshToken = protector.Protect("rt"),
+            Scope = $"openid email {SleepReadScope}",
+            AccessTokenExpiresAtUtc = DateTimeOffset.UtcNow.AddHours(1)
+        });
+        await _dbContext.SaveChangesAsync();
+
+        var status = await CreateService().GetConnectionStatusAsync();
+
+        Assert.True(status.IsConnected);
+        Assert.False(status.RequiresReconnect);
     }
 
     // ── GetValidAccessTokenAsync ─────────────────────────────────────────────
@@ -280,7 +304,11 @@ public sealed class GoogleHealthAuthorizationServiceTests : IAsyncLifetime
         });
 
         return new GoogleHealthAuthorizationService(
-            _dbContext, apiClient, accountClient, adapter, _dp,
+            _dbContext,
+            apiClient,
+            accountClient,
+            adapter,
+            _dp,
             NullLogger<GoogleHealthAuthorizationService>.Instance);
     }
 

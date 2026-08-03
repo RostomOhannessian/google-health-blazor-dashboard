@@ -34,8 +34,8 @@
         <button class="btn btn-primary" type="button" @onclick="SyncNowAsync" disabled="@isSyncing">
             @(isSyncing ? "Syncing…" : $"Sync last {selectedDays} days")
         </button>
-        <a class="btn btn-outline-secondary btn-sm align-self-center google-health-connect" href="/api/health/connect" data-google-health-connect>
-            <span>Reconnect</span>
+        <a class="btn @(connectionStatus?.RequiresReconnect == true ? "btn-warning" : "btn-outline-secondary") btn-sm align-self-center google-health-connect" href="/api/health/connect" data-google-health-connect>
+            <span>@(connectionStatus?.RequiresReconnect == true ? "Reconnect for sleep" : "Reconnect")</span>
             <span class="spinner-border spinner-border-sm google-health-connect-spinner" aria-hidden="true"></span>
             <span class="google-health-connect-status" role="status">Opening Google Health...</span>
         </a>
@@ -51,12 +51,20 @@
 
 <div class="row g-3 mb-4">
     <div class="col-sm-6 col-xl-2">
-        <div class="card h-100 @(connectionStatus?.IsConnected == true ? "border-success" : "border-warning")">
+        <div class="card h-100 @(connectionStatus?.IsConnected == true && connectionStatus.RequiresReconnect != true ? "border-success" : "border-warning")">
             <div class="card-body">
                 <h6 class="card-subtitle text-muted mb-1">Google Health connection</h6>
                 @if (connectionStatus?.IsConnected == true)
                 {
-                    <p class="card-text fw-semibold text-success mb-0">Connected ✓</p>
+                    @if (connectionStatus.RequiresReconnect)
+                    {
+                        <p class="card-text fw-semibold text-warning mb-0">Connected · reconnect required</p>
+                        <small class="text-warning d-block">Reconnect to grant sleep access. Other metrics can still sync.</small>
+                    }
+                    else
+                    {
+                        <p class="card-text fw-semibold text-success mb-0">Connected ✓</p>
+                    }
                     @if (!string.IsNullOrWhiteSpace(connectionStatus.GoogleEmail))
                     {
                         <small class="text-muted d-block">Google account @connectionStatus.GoogleEmail</small>

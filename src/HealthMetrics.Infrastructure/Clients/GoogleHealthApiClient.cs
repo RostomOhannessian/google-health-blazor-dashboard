@@ -38,7 +38,8 @@ internal sealed class GoogleHealthApiClient(
         string accessToken,
         DateOnly startDate,
         DateOnly endDate,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool includeSleep = true)
     {
         if (endDate < startDate)
             throw new ArgumentException("End date must be on or after start date.", nameof(endDate));
@@ -111,7 +112,8 @@ internal sealed class GoogleHealthApiClient(
             ApplyTargetLoad,
             cancellationToken);
 
-        await MergeSleepAsync(snapshots, startDate, endDate, accessToken, cancellationToken);
+        if (includeSleep)
+            await MergeSleepAsync(snapshots, startDate, endDate, accessToken, cancellationToken);
 
         await MergeDailyListAsync(
             snapshots,
@@ -181,8 +183,24 @@ internal sealed class GoogleHealthApiClient(
             catch (GoogleHealthApiException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
             {
                 logger.LogDebug(
-                    "Google Health optional data type is unavailable. DataType: {DataType}.",
-                    dataType);
+                    "Google Health optional data type is unavailable. DataType: {DataType}; StatusCode: {StatusCode}. Trying the next candidate.",
+                    dataType,
+                    (int?)ex.StatusCode);
+            }
+            catch (GoogleHealthApiException ex) when (ex.StatusCode == HttpStatusCode.BadRequest)
+            {
+                logger.LogWarning(
+                    "Google Health optional data type is unavailable. DataType: {DataType}; StatusCode: {StatusCode}. Trying the next candidate.",
+                    dataType,
+                    (int?)ex.StatusCode);
+            }
+            catch (GoogleHealthApiException ex) when (ex.StatusCode == HttpStatusCode.Forbidden)
+            {
+                logger.LogWarning(
+                    "Google Health optional data type is not authorized. DataType: {DataType}; StatusCode: {StatusCode}. Remaining candidates will be skipped.",
+                    dataType,
+                    (int?)ex.StatusCode);
+                return;
             }
         }
     }

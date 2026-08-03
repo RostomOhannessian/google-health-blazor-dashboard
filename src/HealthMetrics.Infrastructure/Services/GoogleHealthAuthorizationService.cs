@@ -2,6 +2,7 @@ using Google.Apis.Auth.OAuth2.Responses;
 using HealthMetrics.Application.Interfaces;
 using HealthMetrics.Application.Models;
 using HealthMetrics.Infrastructure.Clients;
+using HealthMetrics.Infrastructure.Options;
 using HealthMetrics.Infrastructure.Persistence;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
@@ -149,7 +150,8 @@ internal sealed class GoogleHealthAuthorizationService(
                 connection.GoogleEmail,
                 connection.AccessTokenExpiresAtUtc,
                 connection.RefreshTokenExpiresAtUtc,
-                connection.LastSuccessfulSyncAtUtc);
+                connection.LastSuccessfulSyncAtUtc,
+                RequiresReconnect: !GoogleHealthScopes.Contains(connection.Scope, GoogleHealthScopes.SleepRead));
     }
 
     public async Task DisconnectAsync(CancellationToken cancellationToken = default)

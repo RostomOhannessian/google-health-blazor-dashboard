@@ -33,13 +33,17 @@ HealthMetrics.Tests
 3. The client maps optional cardio/target-load candidates and selects one sleep
    session per civil end date, preferring provider-marked main sleep and then
    longest duration.
-4. The service merges results into `daily_metric_snapshots` using
+4. Before requesting sleep, the service checks the persisted OAuth grant. Older
+   connections without `googlehealth.sleep.readonly` skip only sleep, continue
+   syncing already-authorized metrics, and expose reconnect guidance through
+   connection status.
+5. The service merges results into `daily_metric_snapshots` using
    `(UserKey, MetricDate)` idempotency and never replaces an existing provider
    value with a null from a partial response.
-5. After the merge is saved, `AcwrCalculator` recalculates the persisted ratios
+6. After the merge is saved, `AcwrCalculator` recalculates the persisted ratios
    from local history. It clears ratios whose complete 7/28-day windows are no
    longer available.
-6. `sync_history` records requested days, persisted days, duration, outcome, and
+7. `sync_history` records requested days, persisted days, duration, outcome, and
    sanitized errors.
 
 ## Dashboard and derived metrics

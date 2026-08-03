@@ -251,6 +251,59 @@ public sealed class GoogleHealthSyncServiceTests : IAsyncLifetime
             snapshot => Assert.Null(snapshot.Acwr));
     }
 
+    [Fact]
+    public async Task SyncRecentDaysAsync_WhenStoredGrantLacksSleepScope_SkipsSleepAndPersistsCoreMetrics()
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        _dbContext.HealthConnections.Add(new HealthConnection
+        {
+            GoogleUserId = "legacy-user",
+            AccessToken = "unused-by-fake-authorization",
+            RefreshToken = "unused-by-fake-authorization",
+            Scope = "openid email",
+            AccessTokenExpiresAtUtc = DateTimeOffset.UtcNow.AddHours(1)
+        });
+        await _dbContext.SaveChangesAsync();
+
+        var sleepRequested = false;
+        var handler = new StubHandler(req =>
+        {
+            var path = req.RequestUri!.ToString();
+            if (path.Contains("daily-resting-heart-rate"))
+            {
+                return Json($$$"""
+                    {
+                      "dataPoints": [
+                        {
+                          "date": {"year":{{{today.Year}}},"month":{{{today.Month}}},"day":{{{today.Day}}}},
+                          "value": {"beatsPerMinute": 59}
+                        }
+                      ]
+                    }
+                    """);
+            }
+
+            if (path.Contains("dataTypes/sleep/dataPoints"))
+            {
+                sleepRequested = true;
+                return new HttpResponseMessage(HttpStatusCode.Forbidden);
+            }
+
+            return Json("""{}""");
+        });
+
+        await CreateService(handler).SyncRecentDaysAsync(1);
+
+        Assert.False(sleepRequested);
+        var stored = await _dbContext.DailyMetricSnapshots.SingleAsync();
+        Assert.Equal(59, stored.RestingHeartRateBpm);
+        Assert.Null(stored.SleepEfficiency);
+
+        var history = await _dbContext.SyncHistory.SingleAsync();
+        Assert.Equal(SyncOutcome.Success, history.Outcome);
+        Assert.NotNull((await _dbContext.HealthConnections.SingleAsync()).LastSuccessfulSyncAtUtc);
+    }
+
     // ── PartialSuccess outcome ───────────────────────────────────────────────
 
     [Fact]

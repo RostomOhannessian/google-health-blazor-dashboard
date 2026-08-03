@@ -255,7 +255,9 @@ Demo data is synthetic and stays in the local database. The dashboard's
 Choose **Reconnect** after changing scopes (including adding the sleep scope) or
 when a refresh token is revoked. Existing Google grants do not automatically
 include newly configured permissions, so a reconnect is required before sleep
-data can be fetched.
+data can be fetched. Until then, the connection card shows a reconnect warning
+and sync continues for the already granted heart, fitness, and nutrition data;
+only sleep metrics are skipped.
 Choose **Disconnect** to revoke remotely on a best-effort basis and always
 remove local credentials. A database reset also removes the local encrypted
 connection, so reconnect afterward.

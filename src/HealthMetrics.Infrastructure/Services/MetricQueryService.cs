@@ -11,9 +11,9 @@ internal sealed class MetricQueryService(HealthMetricsDbContext dbContext) : IMe
         int dayCount,
         CancellationToken cancellationToken = default)
     {
-        if (dayCount <= 0 || dayCount > 365)
+        if (dayCount <= 0 || dayCount > 366)
         {
-            throw new ArgumentOutOfRangeException(nameof(dayCount), "Day count must be between 1 and 365.");
+            throw new ArgumentOutOfRangeException(nameof(dayCount), "Day count must be between 1 and 366.");
         }
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);

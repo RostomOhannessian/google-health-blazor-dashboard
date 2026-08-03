@@ -192,6 +192,8 @@ public sealed class HealthEndpointTests
         Assert.Contains("Manual load entry", html);
         Assert.Contains("Cardio Load (load points)", html);
         Assert.Contains("Weekly Target (load points)", html);
+        Assert.Contains(">YTD<", html);
+        Assert.Contains("Year to date (since January 1)", html);
         Assert.Contains("min=\"0\"", html);
         Assert.Contains("step=\"0.1\"", html);
         Assert.Contains("inputmode=\"decimal\"", html);

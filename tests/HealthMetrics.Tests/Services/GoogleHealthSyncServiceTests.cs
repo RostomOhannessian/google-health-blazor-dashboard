@@ -37,7 +37,7 @@ public sealed class GoogleHealthSyncServiceTests : IAsyncLifetime
     [Theory]
     [InlineData(0)]
     [InlineData(-1)]
-    [InlineData(91)]
+    [InlineData(367)]
     public async Task SyncRecentDaysAsync_InvalidDayCount_Throws(int days)
     {
         var svc = CreateService();

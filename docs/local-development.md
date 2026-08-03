@@ -263,9 +263,10 @@ discarding data.
 Demo rows include deterministic manual Cardio Load and Monday-starting weekly
 target values, sleep efficiency, deep/REM minutes, and enough history for the
 latest ACWR values. Use the chart toggle to switch between heart/recovery
-trends and weekly manual load; click any snapshot header to sort, including the
-manual target, ACWR, and sleep-efficiency columns. The CSV includes the manual
-source and locally persisted derived values.
+trends and weekly manual load; use YTD to view or sync from January 1; click
+any snapshot header to sort, including the manual target, ACWR, and
+sleep-efficiency columns. The CSV includes the manual source and locally
+persisted derived values.
 
 Do not add a migration for a query translation fix. The sync-history ordering
 uses its generated identity intentionally and does not change the schema.

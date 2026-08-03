@@ -157,7 +157,7 @@ try
 
     app.MapGet("/api/metrics", async (int? days, IMetricQueryService metricQueryService, CancellationToken cancellationToken) =>
     {
-        var requestedDays = days is > 0 and <= 365 ? days.Value : 30;
+        var requestedDays = days is > 0 and <= 366 ? days.Value : 30;
         var metrics = await metricQueryService.GetRecentMetricsAsync(requestedDays, cancellationToken);
         endpointLogger.LogInformation("Metrics query completed for {RequestedDays} day(s). Returned {MetricCount} row(s).", requestedDays, metrics.Count);
         return Results.Ok(metrics);
@@ -165,7 +165,7 @@ try
 
     app.MapGet("/api/metrics/export", async (int? days, IMetricQueryService metricQueryService, CancellationToken cancellationToken) =>
     {
-        var requestedDays = days is > 0 and <= 365 ? days.Value : 365;
+        var requestedDays = days is > 0 and <= 366 ? days.Value : 366;
         var metrics = await metricQueryService.GetRecentMetricsAsync(requestedDays, cancellationToken);
 
         var sb = new StringBuilder();

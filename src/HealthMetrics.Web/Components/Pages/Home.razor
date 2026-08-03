@@ -14,9 +14,14 @@
 <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-1">
     <h1 class="mb-0">Health Metrics</h1>
     <div class="btn-group btn-group-sm" role="group" aria-label="Date range">
-        <button type="button" class="btn @(selectedDays == 7 ? "btn-primary" : "btn-outline-primary")" @onclick="@(() => ChangeRangeAsync(7))">7 d</button>
-        <button type="button" class="btn @(selectedDays == 30 ? "btn-primary" : "btn-outline-primary")" @onclick="@(() => ChangeRangeAsync(30))">30 d</button>
-        <button type="button" class="btn @(selectedDays == 90 ? "btn-primary" : "btn-outline-primary")" @onclick="@(() => ChangeRangeAsync(90))">90 d</button>
+        <button type="button" class="btn @(selectedRange == MetricRange.SevenDays ? "btn-primary" : "btn-outline-primary")" @onclick="@(() => ChangeRangeAsync(MetricRange.SevenDays))">7 d</button>
+        <button type="button" class="btn @(selectedRange == MetricRange.ThirtyDays ? "btn-primary" : "btn-outline-primary")" @onclick="@(() => ChangeRangeAsync(MetricRange.ThirtyDays))">30 d</button>
+        <button type="button" class="btn @(selectedRange == MetricRange.NinetyDays ? "btn-primary" : "btn-outline-primary")" @onclick="@(() => ChangeRangeAsync(MetricRange.NinetyDays))">90 d</button>
+        <button type="button"
+                class="btn @(selectedRange == MetricRange.YearToDate ? "btn-primary" : "btn-outline-primary")"
+                aria-label="Year to date (since January 1)"
+                title="Since January 1"
+                @onclick="@(() => ChangeRangeAsync(MetricRange.YearToDate))">YTD</button>
     </div>
 </div>
 <p class="text-muted mb-3">Daily heart, recovery, manually entered Cardio Load, sleep, fitness, and nutrition metrics persisted locally.</p>
@@ -33,7 +38,7 @@
     else
     {
         <button class="btn btn-primary" type="button" @onclick="SyncNowAsync" disabled="@isSyncing">
-            @(isSyncing ? "Syncing…" : $"Sync last {selectedDays} days")
+            @(isSyncing ? "Syncing…" : SyncRangeText)
         </button>
         <a class="btn @(connectionStatus?.RequiresReconnect == true ? "btn-warning" : "btn-outline-secondary") btn-sm align-self-center google-health-connect" href="/api/health/connect" data-google-health-connect>
             <span>@(connectionStatus?.RequiresReconnect == true ? "Reconnect for sleep" : "Reconnect")</span>
@@ -380,6 +385,7 @@
     private string? manualEntryMessage;
     private readonly ManualLoadForm manualLoadForm = new(DateOnly.FromDateTime(DateTime.UtcNow));
     private bool isConfirmingManualClear;
+    private MetricRange selectedRange = MetricRange.ThirtyDays;
     private int selectedDays = 30;
     private bool chartNeedsRender;
     private ChartMode chartMode = ChartMode.Heart;
@@ -393,6 +399,14 @@
         loadHistory.Any(m => m.CardioLoad.HasValue
             || m.TargetLoad.HasValue
             || m.Acwr.HasValue);
+
+    private int YearToDateDays =>
+        DateOnly.FromDateTime(DateTime.UtcNow).DayOfYear;
+
+    private bool IsYearToDate => selectedRange == MetricRange.YearToDate;
+
+    private string SyncRangeText =>
+        IsYearToDate ? "Sync since January 1" : $"Sync last {selectedDays} days";
 
     private IEnumerable<DailyMetricSnapshot> SortedMetrics =>
         sortColumn switch
@@ -495,6 +509,8 @@
         try
         {
             lastError = null;
+            if (IsYearToDate)
+                selectedDays = YearToDateDays;
             connectionStatus = await OAuthService.GetConnectionStatusAsync(_cts.Token);
             var loaded = await MetricQueryService.GetRecentMetricsAsync(selectedDays, _cts.Token);
             var loadedLoadHistory = await MetricQueryService.GetAllMetricsAsync(_cts.Token);
@@ -519,9 +535,12 @@
         }
     }
 
-    private async Task ChangeRangeAsync(int days)
+    private async Task ChangeRangeAsync(MetricRange range)
     {
-        selectedDays = days;
+        selectedRange = range;
+        selectedDays = range == MetricRange.YearToDate
+            ? YearToDateDays
+            : (int)range;
         await LoadDataAsync();
     }
 
@@ -726,6 +745,14 @@
     {
         Heart,
         Load
+    }
+
+    private enum MetricRange
+    {
+        SevenDays = 7,
+        ThirtyDays = 30,
+        NinetyDays = 90,
+        YearToDate
     }
 
     private sealed class ManualLoadForm(DateOnly metricDate)

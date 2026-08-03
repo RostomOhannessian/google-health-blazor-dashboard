@@ -237,10 +237,10 @@ needed.
 ### Sync
 
 After the dashboard says **Connected**, choose **Sync last 7 days** (or a
-30/90-day range). The server requests supported Google Health data, merges
-daily rows, and records a sync-history entry. A date with no provider value
-is still allowed to display dashes. Google Health data availability depends
-on the account, connected devices, source apps, date range, and granted
+30/90-day or **YTD** range). The server requests supported Google Health data,
+merges daily rows, and records a sync-history entry. A date with no provider
+value is still allowed to display dashes. Google Health data availability
+depends on the account, connected devices, source apps, date range, and granted
 scopes; missing values are not automatically an application error.
 
 ### Demo data and export

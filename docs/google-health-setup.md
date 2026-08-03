@@ -19,7 +19,7 @@ This application uses the Google Health API, not the legacy Fitbit Web API.
 * A **redirect URI** (also called callback URI) is the exact URL Google may
   use to return the browser after consent.
 * **Scopes** are named permissions. This app requests read-only permissions
-  for the three Google Health areas it displays.
+  for the four Google Health areas it displays.
 * **Consent** is the user's decision to grant those scopes.
 * An **authorization code** is the short-lived value Google sends to the
   callback. The server exchanges it; it is not a data token.
@@ -130,7 +130,7 @@ access-blocked or unverified-app message.
 
 ### Data Access
 
-Open **Data Access** and add exactly these five scopes:
+Open **Data Access** and add exactly these six scopes:
 
 ```text
 openid
@@ -138,6 +138,7 @@ email
 https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly
 https://www.googleapis.com/auth/googlehealth.activity_and_fitness.readonly
 https://www.googleapis.com/auth/googlehealth.nutrition.readonly
+https://www.googleapis.com/auth/googlehealth.sleep.readonly
 ```
 
 Why each is present:
@@ -150,6 +151,8 @@ Why each is present:
   data used for daily and run VO2 Max.
 * `googlehealth.nutrition.readonly` covers nutrition rollups for calories,
   carbohydrates, fat, and protein.
+* `googlehealth.sleep.readonly` covers sleep sessions, efficiency, and sleep
+  stage summaries used for sleep efficiency and deep/REM minutes.
 
 They are all read-only. Do not add a scope just to make a consent screen look
 complete. Additional or restricted scopes can change verification and review
@@ -226,7 +229,7 @@ needed.
 
 1. Choose **Connect Google Health**.
 2. Sign in with the test user added under Audience.
-3. Read the consent screen and allow the three read-only scopes.
+3. Read the consent screen and allow the four read-only health scopes.
 4. Google returns to the exact callback URI.
 5. The app validates its one-time state value, exchanges the code, obtains the
    Google user identity, and stores encrypted tokens locally.
@@ -249,7 +252,10 @@ Demo data is synthetic and stays in the local database. The dashboard's
 
 ### Reconnect and disconnect
 
-Choose **Reconnect** after changing scopes or when a refresh token is revoked.
+Choose **Reconnect** after changing scopes (including adding the sleep scope) or
+when a refresh token is revoked. Existing Google grants do not automatically
+include newly configured permissions, so a reconnect is required before sleep
+data can be fetched.
 Choose **Disconnect** to revoke remotely on a best-effort basis and always
 remove local credentials. A database reset also removes the local encrypted
 connection, so reconnect afterward.
@@ -297,7 +303,7 @@ tokens. Protect the local database and rolling logs as personal data.
 | `redirect_uri_mismatch` | Scheme, port, path, or trailing slash differs | Make Cloud Console, user-secrets, and the launch profile exactly `https://localhost:5001/api/health/callback` |
 | `access_denied` or access blocked | Account is not a test user, or app is not approved | Add the signed-in account under Audience → Test users and save |
 | Google Health API is unavailable | API not enabled or project permission/policy blocks it | Enable it under APIs & Services → Library and verify the selected project |
-| A scope is missing from consent | Data Access and app configuration differ | Add the three exact scopes, then reconnect to request fresh consent |
+| A scope is missing from consent | Data Access and app configuration differ | Add the six exact scopes, then reconnect to request fresh consent |
 | `invalid_client` | Wrong client type or copied credential | Use a Web application client and replace local values from the same client |
 | `invalid_grant` during sync | Testing refresh token expired/revoked | Reconnect; testing refresh tokens commonly expire after about seven days |
 | `invalid_state` after callback | Callback was delayed, duplicated, or opened directly | Start Connect again in the same browser; do not bookmark the callback |

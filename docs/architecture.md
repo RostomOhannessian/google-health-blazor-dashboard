@@ -30,8 +30,28 @@ HealthMetrics.Tests
 
 1. `GoogleHealthSyncService` asks `IHealthAuthorizationService` for a valid access token.
 2. `GoogleHealthApiClient` fetches the selected date range by Google data type.
-3. The service merges results into `daily_metric_snapshots` using `(UserKey, MetricDate)` idempotency.
-4. `sync_history` records requested days, persisted days, duration, outcome, and sanitized errors.
+3. The client maps optional cardio/target-load candidates and selects one sleep
+   session per civil end date, preferring provider-marked main sleep and then
+   longest duration.
+4. The service merges results into `daily_metric_snapshots` using
+   `(UserKey, MetricDate)` idempotency and never replaces an existing provider
+   value with a null from a partial response.
+5. After the merge is saved, `AcwrCalculator` recalculates the persisted ratios
+   from local history. It clears ratios whose complete 7/28-day windows are no
+   longer available.
+6. `sync_history` records requested days, persisted days, duration, outcome, and
+   sanitized errors.
+
+## Dashboard and derived metrics
+
+`MetricQueryService` returns local snapshots to the interactive Home component.
+The page derives the latest cardio-load target display and ACWR status badge from
+the persisted fields. The table exposes sortable cardio load, target range, ACWR,
+and sleep-efficiency columns with `—` fallbacks. Chart.js keeps the existing
+Heart & HRV view separate from the Cardio & Load Strain view; the latter uses
+cardio-load bars plus two line datasets whose fill creates the target-load band.
+The CSV endpoint exports the persisted source and derived values, including
+deep/REM minutes, with invariant-culture numeric formatting.
 
 ## Logging and observability
 

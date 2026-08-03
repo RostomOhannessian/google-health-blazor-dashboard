@@ -67,6 +67,27 @@ public sealed class WeeklyLoadCalculatorTests
     }
 
     [Fact]
+    public void BuildDailySeries_PreservesWeekToDateLoadForAPartialWeekDisplay()
+    {
+        var monday = new DateOnly(2026, 8, 3);
+        var series = WeeklyLoadCalculator.BuildDailySeries(
+        [
+            new DailyMetricSnapshot { MetricDate = monday, CardioLoad = 40m },
+            new DailyMetricSnapshot { MetricDate = monday.AddDays(1), CardioLoad = 30m },
+            new DailyMetricSnapshot { MetricDate = monday.AddDays(2), CardioLoad = 20m },
+            new DailyMetricSnapshot { MetricDate = monday.AddDays(3), CardioLoad = 10m }
+        ]);
+
+        var visiblePoints = series
+            .Where(point => point.MetricDate >= monday.AddDays(2))
+            .ToList();
+
+        Assert.Equal(
+            new decimal?[] { 90m, 100m },
+            visiblePoints.Select(point => point.CumulativeCardioLoad).ToArray());
+    }
+
+    [Fact]
     public void Summarize_SumsDailyLoadAndUsesTheLastWeeklyValues()
     {
         var monday = new DateOnly(2026, 8, 3);

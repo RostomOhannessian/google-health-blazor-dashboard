@@ -224,6 +224,7 @@ public sealed class HealthEndpointTests
         Assert.Contains("Daily values (weeks start Monday)", script);
         Assert.Contains("type: \"bar\"", script);
         Assert.Contains("loadWeekBands", script);
+        Assert.Contains("isWeekBoundary", script);
     }
 
     [Theory]

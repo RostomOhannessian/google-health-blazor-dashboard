@@ -182,12 +182,13 @@
                         Record proprietary manual Cardio Load and a weekly Target Load. Weeks run Monday through Sunday, and the values drive the Manual Cardio ACWR calculation only.
                     </p>
                     <EditForm Model="manualLoadForm" OnSubmit="SaveManualLoadAsync" FormName="manual-load-entry-form">
-                        <fieldset aria-describedby="manual-load-help manual-load-autosave-help">
+                        <fieldset aria-describedby="manual-load-help manual-load-autosave-help" disabled="@isSavingManual">
                             <legend class="visually-hidden">Manual load entry</legend>
                             <div class="form-check mb-3">
                                 <input id="manual-load-autosave"
                                        class="form-check-input"
                                        type="checkbox"
+                                       @onmousedown="SuppressNextManualLoadAutoSave"
                                        @bind="manualAutoSaveEnabled"
                                        @bind:after="HandleManualAutoSaveSettingChanged" />
                                 <label class="form-check-label" for="manual-load-autosave">Enable autosave</label>
@@ -249,7 +250,10 @@
                                 Autosave is optional. When enabled, valid changes save automatically while typing and when leaving a field. Otherwise, use Save manual load. Values must be zero or greater; leave a field blank to clear it.
                             </p>
                             <div class="d-flex flex-wrap gap-2">
-                                <button class="btn btn-primary" type="submit" disabled="@isSavingManual">
+                                <button class="btn btn-primary"
+                                        type="submit"
+                                        @onmousedown="SuppressNextManualLoadAutoSave"
+                                        disabled="@isSavingManual">
                                     @(isSavingManual ? "Saving…" : "Save manual load")
                                 </button>
                                 <button class="btn btn-outline-secondary"
@@ -530,7 +534,13 @@
                 .ToList();
             if (chartMode == ChartMode.Load)
             {
-                var dailyLoad = WeeklyLoadCalculator.BuildDailySeries(ordered);
+                var selectedLoadDates = loadChartMetrics
+                    .Select(metric => metric.MetricDate)
+                    .ToHashSet();
+                // Preserve week-to-date totals before limiting the plotted points to the selected range.
+                var dailyLoad = WeeklyLoadCalculator.BuildDailySeries(loadHistory)
+                    .Where(day => selectedLoadDates.Contains(day.MetricDate))
+                    .ToList();
                 var labels = dailyLoad
                     .Select(day => day.MetricDate.ToString("ddd, MMM d"))
                     .ToArray();
@@ -591,7 +601,10 @@
         }
     }
 
-    private void OpenManualLoadModal()
+    private void OpenManualLoadModal() =>
+        OpenManualLoadModalForDate(DateOnly.FromDateTime(DateTime.UtcNow));
+
+    private void OpenManualLoadModalForDate(DateOnly metricDate)
     {
         CancelPendingManualAutoSave();
         suppressNextManualAutoSave = false;
@@ -599,13 +612,8 @@
         isConfirmingManualClear = false;
         manualEntryError = false;
         manualEntryMessage = null;
-    }
-
-    private void OpenManualLoadModalForDate(DateOnly metricDate)
-    {
-        OpenManualLoadModal();
         manualLoadForm.MetricDate = metricDate;
-        LoadManualInputsForSelectedDate();
+        ResetManualLoadInputs(showFeedback: false);
     }
 
     private void CloseManualLoadModal()
@@ -866,7 +874,9 @@
         LoadManualInputsForSelectedDate();
     }
 
-    private void ResetManualLoadInputs()
+    private void ResetManualLoadInputs() => ResetManualLoadInputs(showFeedback: true);
+
+    private void ResetManualLoadInputs(bool showFeedback)
     {
         CancelPendingManualAutoSave();
         suppressNextManualAutoSave = false;
@@ -882,7 +892,9 @@
         manualTargetLoadText = FormatManualLoad(manualLoadForm.TargetLoad);
         isConfirmingManualClear = false;
         manualEntryError = false;
-        manualEntryMessage = "Unsaved changes were reset to the saved values for this date.";
+        manualEntryMessage = showFeedback
+            ? "Unsaved changes were reset to the saved values for this date."
+            : null;
     }
 
     private void BeginManualLoadClear()

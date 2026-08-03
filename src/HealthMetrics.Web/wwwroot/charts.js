@@ -75,6 +75,16 @@ window.HealthCharts = (function () {
         return ranges;
     }
 
+    function isWeekBoundary(segmentContext, weekStarts) {
+        if (!Array.isArray(weekStarts)) return false;
+
+        const previousWeek = weekStarts[segmentContext.p0DataIndex];
+        const currentWeek = weekStarts[segmentContext.p1DataIndex];
+        return previousWeek !== undefined
+            && currentWeek !== undefined
+            && previousWeek !== currentWeek;
+    }
+
     const loadWeekBandsPlugin = {
         id: "loadWeekBands",
 
@@ -267,6 +277,12 @@ window.HealthCharts = (function () {
                     pointHoverRadius: 5,
                     tension: 0.25,
                     spanGaps: false,
+                    segment: {
+                        borderColor: context =>
+                            isWeekBoundary(context, weekStarts)
+                                ? "rgba(111, 66, 193, 0)"
+                                : "rgb(111, 66, 193)"
+                    },
                     yAxisID: "yLoad"
                 });
             }

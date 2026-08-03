@@ -167,18 +167,34 @@ try
             return Results.Redirect("/");
         });
 
-    app.MapGet("/api/metrics", async (int? days, IMetricQueryService metricQueryService, CancellationToken cancellationToken) =>
+    app.MapGet("/api/metrics", async (
+        int? days,
+        DateOnly? endDate,
+        IMetricQueryService metricQueryService,
+        CancellationToken cancellationToken) =>
     {
         var requestedDays = days is > 0 and <= 366 ? days.Value : 30;
-        var metrics = await metricQueryService.GetRecentMetricsAsync(requestedDays, cancellationToken);
+        var rangeEndDate = endDate ?? DateOnly.FromDateTime(DateTime.UtcNow);
+        var metrics = await metricQueryService.GetMetricsAsync(
+            rangeEndDate.AddDays(1 - requestedDays),
+            rangeEndDate,
+            cancellationToken);
         endpointLogger.LogInformation("Metrics query completed for {RequestedDays} day(s). Returned {MetricCount} row(s).", requestedDays, metrics.Count);
         return Results.Ok(metrics);
     });
 
-    app.MapGet("/api/metrics/export", async (int? days, IMetricQueryService metricQueryService, CancellationToken cancellationToken) =>
+    app.MapGet("/api/metrics/export", async (
+        int? days,
+        DateOnly? endDate,
+        IMetricQueryService metricQueryService,
+        CancellationToken cancellationToken) =>
     {
         var requestedDays = days is > 0 and <= 366 ? days.Value : 366;
-        var metrics = await metricQueryService.GetRecentMetricsAsync(requestedDays, cancellationToken);
+        var rangeEndDate = endDate ?? DateOnly.FromDateTime(DateTime.UtcNow);
+        var metrics = await metricQueryService.GetMetricsAsync(
+            rangeEndDate.AddDays(1 - requestedDays),
+            rangeEndDate,
+            cancellationToken);
 
         var sb = new StringBuilder();
         sb.AppendLine("Date,RestingHR_bpm,HRV_RMSSD_ms,DailyVO2Max_ml_kg_min,RunVO2Max_ml_kg_min,ManualCardioLoad,ManualTargetLoad,ManualACWR,SleepEfficiency_pct,DeepSleep_min,RemSleep_min,Calories_kcal,Carbs_g,Fat_g,Protein_g");
@@ -188,7 +204,7 @@ try
                 $"{m.MetricDate:yyyy-MM-dd},{m.RestingHeartRateBpm},{m.HrvRmssdMilliseconds},{m.DailyVo2MaxMlKgMin},{m.RunVo2MaxMlKgMin},{m.CardioLoad},{m.TargetLoad},{m.Acwr},{m.SleepEfficiency},{m.DeepSleepMinutes},{m.RemSleepMinutes},{m.ConsumedCaloriesKcal},{m.CarbohydratesGrams},{m.FatGrams},{m.ProteinGrams}"));
         }
 
-        var filename = $"health-metrics-{DateOnly.FromDateTime(DateTime.UtcNow):yyyy-MM-dd}.csv";
+        var filename = $"health-metrics-{rangeEndDate:yyyy-MM-dd}.csv";
         endpointLogger.LogInformation(
             "Metrics CSV export generated for {RequestedDays} day(s). Exported {MetricCount} row(s) to {FileName}.",
             requestedDays,

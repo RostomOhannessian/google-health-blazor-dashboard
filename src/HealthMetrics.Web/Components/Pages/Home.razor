@@ -351,8 +351,12 @@
 <div class="d-flex align-items-baseline justify-content-between mb-2">
     <h2 class="h5 mb-0">Daily snapshots</h2>
     <div class="d-flex align-items-center gap-3">
-        <a href="/api/metrics/export?days=@SelectedDayCount" class="small text-decoration-none" download>⬇ Export CSV</a>
-        <small class="text-muted">@metrics.Count of @SelectedDayCount days · — = not recorded for that date</small>
+        <a href="/api/metrics/export?days=@SelectedDayCount&amp;endDate=@SelectedDateRange.EndDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)"
+           class="small text-decoration-none"
+           download>⬇ Export CSV</a>
+        <small class="text-muted">
+            @metrics.Count of @SelectedDayCount days through @SelectedDateRange.EndDate.ToString("MMM d", CultureInfo.CurrentCulture) · — = not recorded for that date
+        </small>
     </div>
 </div>
 <div class="table-responsive">
@@ -544,16 +548,20 @@
             || m.TargetLoad.HasValue
             || m.Acwr.HasValue);
 
-    private int YearToDateDays =>
-        DateOnly.FromDateTime(DateTime.UtcNow).DayOfYear;
-
     private bool IsYearToDate => selectedRange == MetricRange.YearToDate;
 
+    private MetricDateRange SelectedDateRange =>
+        IsYearToDate
+            ? MetricDateRange.ForYearToDate(DateOnly.FromDateTime(DateTime.UtcNow))
+            : MetricDateRange.ForRecentFullWeeks((int)selectedRange, DateOnly.FromDateTime(DateTime.UtcNow));
+
     private int SelectedDayCount =>
-        IsYearToDate ? YearToDateDays : (int)selectedRange;
+        SelectedDateRange.DayCount;
 
     private string SyncRangeText =>
-        IsYearToDate ? "Sync since January 1" : $"Sync last {SelectedDayCount} days";
+        IsYearToDate
+            ? $"Sync YTD through {SelectedDateRange.EndDate.ToString("MMM d", CultureInfo.CurrentCulture)}"
+            : $"Sync last {SelectedDayCount} days";
 
     private IEnumerable<DailyMetricSnapshot> SortedMetrics =>
         sortColumn switch
@@ -646,13 +654,14 @@
 
     private async Task SyncNowAsync()
     {
-        var dayCount = SelectedDayCount;
+        var dateRange = SelectedDateRange;
+        var dayCount = dateRange.DayCount;
         try
         {
             lastError = null;
             isSyncing = true;
             StateHasChanged();
-            await SyncService.SyncRecentDaysAsync(dayCount, _cts.Token);
+            await SyncService.SyncDateRangeAsync(dateRange.StartDate, dateRange.EndDate, _cts.Token);
             await LoadDataAsync();
         }
         catch (Exception ex)
@@ -695,9 +704,12 @@
         try
         {
             var authError = lastError;
-            var dayCount = SelectedDayCount;
+            var dateRange = SelectedDateRange;
             connectionStatus = await OAuthService.GetConnectionStatusAsync(_cts.Token);
-            var loaded = await MetricQueryService.GetRecentMetricsAsync(dayCount, _cts.Token);
+            var loaded = await MetricQueryService.GetMetricsAsync(
+                dateRange.StartDate,
+                dateRange.EndDate,
+                _cts.Token);
             var loadedLoadHistory = await MetricQueryService.GetAllMetricsAsync(_cts.Token);
             metrics.Clear();
             metrics.AddRange(loaded);

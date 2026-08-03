@@ -370,18 +370,33 @@ public sealed class HealthEndpointTests
     {
         public Task<SyncResult> SyncRecentDaysAsync(int dayCount, CancellationToken cancellationToken = default) =>
             Task.FromResult(new SyncResult(dayCount, dayCount, DateTimeOffset.UtcNow));
+
+        public Task<SyncResult> SyncDateRangeAsync(
+            DateOnly startDate,
+            DateOnly endDate,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new SyncResult(endDate.DayNumber - startDate.DayNumber + 1, endDate.DayNumber - startDate.DayNumber + 1, DateTimeOffset.UtcNow));
     }
 
     private sealed class FakeMetricQueryService(bool includeOlderMetric) : IMetricQueryService
     {
         public Task<IReadOnlyList<DailyMetricSnapshot>> GetRecentMetricsAsync(int dayCount, CancellationToken cancellationToken = default) =>
+            GetFakeMetrics();
+
+        public Task<IReadOnlyList<DailyMetricSnapshot>> GetMetricsAsync(
+            DateOnly startDate,
+            DateOnly endDate,
+            CancellationToken cancellationToken = default) =>
+            GetFakeMetrics();
+
+        private Task<IReadOnlyList<DailyMetricSnapshot>> GetFakeMetrics() =>
             Task.FromResult<IReadOnlyList<DailyMetricSnapshot>>(
             includeOlderMetric
                 ? [CreateSnapshot(new DateOnly(2026, 7, 18)), CreateSnapshot(new DateOnly(2026, 7, 17))]
                 : [CreateSnapshot(new DateOnly(2026, 7, 18))]);
 
         public Task<IReadOnlyList<DailyMetricSnapshot>> GetAllMetricsAsync(CancellationToken cancellationToken = default) =>
-            GetRecentMetricsAsync(365, cancellationToken);
+            GetFakeMetrics();
 
         public Task<IReadOnlyList<SyncHistoryEntry>> GetRecentSyncHistoryAsync(int count = 10, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<SyncHistoryEntry>>([]);

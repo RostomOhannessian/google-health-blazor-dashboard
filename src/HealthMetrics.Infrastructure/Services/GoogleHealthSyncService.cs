@@ -20,12 +20,29 @@ internal sealed class GoogleHealthSyncService(
         if (dayCount <= 0 || dayCount > 366)
             throw new ArgumentOutOfRangeException(nameof(dayCount), "Day count must be between 1 and 366.");
 
-        return await SnapshotMutationCoordinator.RunAsync(
-            () => RunSyncCoreAsync(dayCount, cancellationToken),
+        var endDate = DateOnly.FromDateTime(DateTime.UtcNow);
+        return await SyncDateRangeAsync(
+            endDate.AddDays(-(dayCount - 1)),
+            endDate,
             cancellationToken);
     }
 
-    private async Task<SyncResult> RunSyncCoreAsync(int dayCount, CancellationToken cancellationToken)
+    public async Task<SyncResult> SyncDateRangeAsync(
+        DateOnly startDate,
+        DateOnly endDate,
+        CancellationToken cancellationToken = default)
+    {
+        var dayCount = ValidateDateRange(startDate, endDate);
+        return await SnapshotMutationCoordinator.RunAsync(
+            () => RunSyncCoreAsync(startDate, endDate, dayCount, cancellationToken),
+            cancellationToken);
+    }
+
+    private async Task<SyncResult> RunSyncCoreAsync(
+        DateOnly startDate,
+        DateOnly endDate,
+        int dayCount,
+        CancellationToken cancellationToken)
     {
         var stopwatch = Stopwatch.StartNew();
         var historyEntry = new SyncHistoryEntry
@@ -55,8 +72,6 @@ internal sealed class GoogleHealthSyncService(
                     "Google Health sleep metrics will be skipped because the stored connection does not include the sleep read scope. Reconnect to grant the new scope.");
             }
 
-            var endDate = DateOnly.FromDateTime(DateTime.UtcNow);
-            var startDate = endDate.AddDays(-(dayCount - 1));
             logger.LogInformation(
                 "Google Health sync date range calculated. SyncHistoryEntryId: {SyncHistoryEntryId}; StartDate: {StartDate}; EndDate: {EndDate}.",
                 historyEntry.Id,
@@ -158,6 +173,20 @@ internal sealed class GoogleHealthSyncService(
 
             throw;
         }
+    }
+
+    private static int ValidateDateRange(DateOnly startDate, DateOnly endDate)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var dayCount = endDate.DayNumber - startDate.DayNumber + 1;
+        if (startDate > endDate || endDate > today || dayCount > 366)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(endDate),
+                "Date range must be ordered, end no later than today, and contain at most 366 days.");
+        }
+
+        return dayCount;
     }
 
     private static void Merge(DailyMetricSnapshot target, DailyMetricSnapshot source)

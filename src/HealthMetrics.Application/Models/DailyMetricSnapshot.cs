@@ -16,6 +16,20 @@ public sealed class DailyMetricSnapshot
 
     public decimal? RunVo2MaxMlKgMin { get; set; }
 
+    public decimal? CardioLoad { get; set; }
+
+    public decimal? TargetLoadMin { get; set; }
+
+    public decimal? TargetLoadMax { get; set; }
+
+    public decimal? Acwr { get; set; }
+
+    public decimal? SleepEfficiency { get; set; }
+
+    public int? DeepSleepMinutes { get; set; }
+
+    public int? RemSleepMinutes { get; set; }
+
     public int? ConsumedCaloriesKcal { get; set; }
 
     public decimal? CarbohydratesGrams { get; set; }

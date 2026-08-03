@@ -125,7 +125,7 @@
             <div class="card-body">
                 <h6 class="card-subtitle text-muted mb-1">Manual Cardio Load</h6>
                 <p class="card-text fw-semibold mb-0">@CardioLoadText(summary)</p>
-                <small class="text-muted d-block">Proprietary, user-entered load and target</small>
+                <small class="text-muted d-block">Proprietary, user-entered load and weekly target</small>
                 <a class="small" href="#manual-load-entry">Enter or edit manual load</a>
             </div>
         </div>
@@ -149,11 +149,11 @@
 
 <section class="card mb-4" id="manual-load-entry" aria-labelledby="manual-load-entry-heading" tabindex="-1">
     <div class="card-header">
-        <h2 class="h5 mb-0" id="manual-load-entry-heading">Manual Cardio Load and Target Load</h2>
+        <h2 class="h5 mb-0" id="manual-load-entry-heading">Manual Cardio Load and Weekly Target Load</h2>
     </div>
     <div class="card-body">
         <p class="mb-3" id="manual-load-help">
-            Record proprietary manual Cardio Load and Target Load values. They drive the Manual Cardio ACWR calculation only.
+            Record proprietary manual Cardio Load and a weekly Target Load. Weeks run Monday through Sunday, and the values drive the Manual Cardio ACWR calculation only.
         </p>
         <EditForm Model="manualLoadForm" OnSubmit="SaveManualLoadAsync" FormName="manual-load-entry-form">
             <fieldset aria-describedby="manual-load-help">
@@ -180,7 +180,7 @@
                         <div class="form-text" id="manual-cardio-load-help">Optional proprietary daily load.</div>
                     </div>
                     <div class="col-12 col-md-4 col-xl-3">
-                        <label class="form-label" for="manual-target">Target (load points)</label>
+                        <label class="form-label" for="manual-target">Weekly Target (load points)</label>
                         <InputNumber id="manual-target"
                                      class="form-control"
                                      @bind-Value="manualLoadForm.TargetLoad"
@@ -188,7 +188,7 @@
                                      step="0.1"
                                      inputmode="decimal"
                                      aria-describedby="manual-target-help" />
-                        <div class="form-text" id="manual-target-help">Optional daily target amount.</div>
+                        <div class="form-text" id="manual-target-help">Optional Monday–Sunday target amount.</div>
                     </div>
                 </div>
                 <p class="form-text mb-3">
@@ -211,7 +211,7 @@
         {
             <div class="alert alert-warning mt-3 mb-0" role="alert" id="manual-load-clear-confirmation">
                 <p class="mb-2">
-                    Clear all saved manual Cardio Load and Target Load values for @manualLoadForm.MetricDate.ToString("MMMM d, yyyy")?
+                    Clear the saved manual Cardio Load for @manualLoadForm.MetricDate.ToString("MMMM d, yyyy") and the weekly Target Load for the week starting @WeeklyLoadCalculator.GetWeekStart(manualLoadForm.MetricDate).ToString("MMMM d, yyyy")?
                     Other saved health metrics will not be changed.
                 </p>
                 <div class="d-flex flex-wrap gap-2">
@@ -240,7 +240,7 @@
 {
     <div class="card mb-4">
         <div class="card-header d-flex align-items-center justify-content-between gap-2 flex-wrap">
-            <span class="fw-semibold">@(chartMode == ChartMode.Load ? "Manual Cardio Load & training strain" : "Heart rate & HRV trend")</span>
+            <span class="fw-semibold">@(chartMode == ChartMode.Load ? "Weekly Cardio Load & training strain" : "Heart rate & HRV trend")</span>
             <div class="btn-group btn-group-sm" role="group" aria-label="Chart metric">
                 <button type="button" class="btn @(chartMode == ChartMode.Heart ? "btn-primary" : "btn-outline-primary")" @onclick="@(() => SetChartModeAsync(ChartMode.Heart))" disabled="@(!HasHeartMetrics)">Heart &amp; HRV</button>
                 <button type="button" class="btn @(chartMode == ChartMode.Load ? "btn-primary" : "btn-outline-primary")" @onclick="@(() => SetChartModeAsync(ChartMode.Load))" disabled="@(!HasLoadMetrics)">Load</button>
@@ -264,15 +264,15 @@
         <thead>
             <tr>
                 <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("date"))">Date @SortIndicator("date")</button></th>
-                <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("restingHr"))">Resting HR @SortIndicator("restingHr")</button></th>
+                <th class="border-start"><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("restingHr"))">Resting HR @SortIndicator("restingHr")</button></th>
                 <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("hrv"))">HRV (ms) @SortIndicator("hrv")</button></th>
-                <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("dailyVo2"))">Daily VO2 Max @SortIndicator("dailyVo2")</button></th>
+                <th class="border-start"><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("dailyVo2"))">Daily VO2 Max @SortIndicator("dailyVo2")</button></th>
                 <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("runVo2"))">Run VO2 Max @SortIndicator("runVo2")</button></th>
-                <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("cardioLoad"))">Manual Cardio Load @SortIndicator("cardioLoad")</button></th>
-                <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("targetLoad"))">Manual target @SortIndicator("targetLoad")</button></th>
-                <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("acwr"))">Manual ACWR @SortIndicator("acwr")</button></th>
-                <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("sleepEfficiency"))">Sleep Efficiency (%) @SortIndicator("sleepEfficiency")</button></th>
-                <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("calories"))">Calories @SortIndicator("calories")</button></th>
+                <th class="border-start"><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("cardioLoad"))">Cardio Load (Manual) @SortIndicator("cardioLoad")</button></th>
+                <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("targetLoad"))">Target Load (Manual) @SortIndicator("targetLoad")</button></th>
+                <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("acwr"))">ACWR @SortIndicator("acwr")</button></th>
+                <th class="border-start"><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("sleepEfficiency"))">Sleep Efficiency (%) @SortIndicator("sleepEfficiency")</button></th>
+                <th class="border-start"><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("calories"))">Calories @SortIndicator("calories")</button></th>
                 <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("carbs"))">Carbs (g) @SortIndicator("carbs")</button></th>
                 <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("fat"))">Fat (g) @SortIndicator("fat")</button></th>
                 <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("protein"))">Protein (g) @SortIndicator("protein")</button></th>
@@ -294,16 +294,16 @@
                 @foreach (var metric in SortedMetrics)
                 {
                     <tr>
-                        <td>@metric.MetricDate.ToString("MMM d")</td>
-                        <td>@Display(metric.RestingHeartRateBpm)</td>
+                        <td>@metric.MetricDate.ToString("ddd, MMM d")</td>
+                        <td class="border-start">@Display(metric.RestingHeartRateBpm)</td>
                         <td>@Display(metric.HrvRmssdMilliseconds, "F3")</td>
-                        <td>@Display(metric.DailyVo2MaxMlKgMin, "F1")</td>
+                        <td class="border-start">@Display(metric.DailyVo2MaxMlKgMin, "F1")</td>
                         <td>@Display(metric.RunVo2MaxMlKgMin)</td>
-                        <td>@Display(metric.CardioLoad, "F1")</td>
+                        <td class="border-start">@Display(metric.CardioLoad, "F1")</td>
                         <td>@TargetLoadText(metric.TargetLoad)</td>
                         <td>@Display(metric.Acwr, "F2")</td>
-                        <td>@Display(metric.SleepEfficiency, "F2")</td>
-                        <td>@Display(metric.ConsumedCaloriesKcal)</td>
+                        <td class="border-start">@Display(metric.SleepEfficiency, "F2")</td>
+                        <td class="border-start">@Display(metric.ConsumedCaloriesKcal)</td>
                         <td>@Display(metric.CarbohydratesGrams, "F2")</td>
                         <td>@Display(metric.FatGrams, "F2")</td>
                         <td>@Display(metric.ProteinGrams, "F2")</td>
@@ -383,7 +383,7 @@
     private bool chartNeedsRender;
     private ChartMode chartMode = ChartMode.Heart;
     private string sortColumn = "date";
-    private bool sortDescending;
+    private bool sortDescending = true;
 
     private bool HasHeartMetrics =>
         metrics.Any(m => m.RestingHeartRateBpm.HasValue || m.HrvRmssdMilliseconds.HasValue);
@@ -429,12 +429,15 @@
         {
             chartNeedsRender = false;
             var ordered = metrics.OrderBy(m => m.MetricDate).ToList();
-            var labels   = ordered.Select(m => m.MetricDate.ToString("MMM d")).ToArray();
             if (chartMode == ChartMode.Load)
             {
-                var cardioLoadData = ordered.Select(m => (object?)m.CardioLoad).ToArray();
-                var targetData = ordered.Select(m => (object?)m.TargetLoad).ToArray();
-                var manualAcwrData = ordered.Select(m => (object?)m.Acwr).ToArray();
+                var weeklyLoad = WeeklyLoadCalculator.Summarize(ordered);
+                var labels = weeklyLoad
+                    .Select(week => $"Week of {week.WeekStart:MMM d}")
+                    .ToArray();
+                var cardioLoadData = weeklyLoad.Select(week => (object?)week.CardioLoad).ToArray();
+                var targetData = weeklyLoad.Select(week => (object?)week.TargetLoad).ToArray();
+                var manualAcwrData = weeklyLoad.Select(week => (object?)week.Acwr).ToArray();
                 await JS.InvokeVoidAsync(
                     "HealthCharts.renderLoad",
                     "metricsChart",
@@ -445,6 +448,7 @@
             }
             else
             {
+                var labels = ordered.Select(m => m.MetricDate.ToString("MMM d")).ToArray();
                 var hrData   = ordered.Select(m => (object?)(m.RestingHeartRateBpm.HasValue ? m.RestingHeartRateBpm.Value : (int?)null)).ToArray();
                 var hrvData  = ordered.Select(m => (object?)(m.HrvRmssdMilliseconds.HasValue ? (double)m.HrvRmssdMilliseconds.Value : (double?)null)).ToArray();
                 await JS.InvokeVoidAsync("HealthCharts.render", "metricsChart", labels, hrData, hrvData);
@@ -529,7 +533,7 @@
                 _cts.Token);
             manualEntryError = !result.Succeeded;
             manualEntryMessage = result.Succeeded
-                ? "Manual Cardio Load saved."
+                ? "Manual Cardio Load and weekly Target Load saved."
                 : result.ErrorMessage;
             if (result.Succeeded)
             {
@@ -554,8 +558,13 @@
     private void ResetManualLoadInputs()
     {
         var snapshot = metrics.SingleOrDefault(metric => metric.MetricDate == manualLoadForm.MetricDate);
+        var weekStart = WeeklyLoadCalculator.GetWeekStart(manualLoadForm.MetricDate);
         manualLoadForm.CardioLoad = snapshot?.CardioLoad;
-        manualLoadForm.TargetLoad = snapshot?.TargetLoad;
+        manualLoadForm.TargetLoad = metrics
+            .Where(metric => WeeklyLoadCalculator.GetWeekStart(metric.MetricDate) == weekStart)
+            .OrderByDescending(metric => metric.MetricDate)
+            .Select(metric => metric.TargetLoad)
+            .FirstOrDefault(target => target.HasValue);
         isConfirmingManualClear = false;
         manualEntryError = false;
         manualEntryMessage = "Unsaved changes were reset to the saved values for this date.";
@@ -622,7 +631,7 @@
         if (metricSummary?.LatestCardioLoad is null)
             return "—";
 
-        return $"{metricSummary.LatestCardioLoad.Value:F1} / Target: {TargetLoadText(metricSummary.LatestTargetLoad)}";
+        return $"{metricSummary.LatestCardioLoad.Value:F1} / Weekly target: {TargetLoadText(metricSummary.LatestTargetLoad)}";
     }
 
     private static string TargetLoadText(decimal? target)

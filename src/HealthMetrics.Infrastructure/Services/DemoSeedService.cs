@@ -26,6 +26,8 @@ internal sealed class DemoSeedService(HealthMetricsDbContext dbContext) : IDemoS
 
             // Deterministic seed per calendar date — same run always produces the same values.
             var rng = new Random(date.DayNumber);
+            var weekStart = WeeklyLoadCalculator.GetWeekStart(date);
+            var weeklyTarget = Math.Round((decimal)(new Random(weekStart.DayNumber).NextDouble() * 250 + 350), 1);
             var cardioLoad = Math.Round((decimal)(rng.NextDouble() * 55 + 45), 1);
 
             dbContext.DailyMetricSnapshots.Add(new DailyMetricSnapshot
@@ -37,7 +39,7 @@ internal sealed class DemoSeedService(HealthMetricsDbContext dbContext) : IDemoS
                 DailyVo2MaxMlKgMin   = rng.Next(0, 8) == 0 ? null : Math.Round((decimal)(rng.NextDouble() * 14 + 42), 1),
                 RunVo2MaxMlKgMin     = rng.Next(0, 8) == 0 ? null : Math.Round((decimal)(rng.NextDouble() * 14 + 42), 1),
                 CardioLoad           = cardioLoad,
-                TargetLoad           = cardioLoad,
+                TargetLoad           = weeklyTarget,
                 SleepEfficiency      = Math.Round((decimal)(rng.NextDouble() * 15 + 82), 2),
                 DeepSleepMinutes     = rng.Next(45, 111),
                 RemSleepMinutes      = rng.Next(70, 151),

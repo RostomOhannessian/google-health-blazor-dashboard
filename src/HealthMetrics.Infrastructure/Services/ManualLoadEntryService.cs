@@ -29,6 +29,17 @@ internal sealed class ManualLoadEntryService(HealthMetricsDbContext dbContext) :
             dbContext.DailyMetricSnapshots.Add(snapshot);
         }
 
+        var weekStart = WeeklyLoadCalculator.GetWeekStart(entry.MetricDate);
+        var weekEnd = weekStart.AddDays(6);
+        var weeklySnapshots = await dbContext.DailyMetricSnapshots
+            .Where(item =>
+                item.UserKey == LocalUser.Key
+                && item.MetricDate >= weekStart
+                && item.MetricDate <= weekEnd)
+            .ToListAsync(cancellationToken);
+        foreach (var weeklySnapshot in weeklySnapshots)
+            weeklySnapshot.TargetLoad = null;
+
         snapshot.CardioLoad = entry.CardioLoad;
         snapshot.TargetLoad = entry.TargetLoad;
 
@@ -49,7 +60,7 @@ internal sealed class ManualLoadEntryService(HealthMetricsDbContext dbContext) :
         if (entry.CardioLoad is < 0)
             return "Manual Cardio Load cannot be negative.";
         if (entry.TargetLoad is < 0)
-            return "Manual target cannot be negative.";
+            return "Weekly target cannot be negative.";
 
         return null;
     }

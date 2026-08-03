@@ -69,6 +69,41 @@ public sealed class MetricQueryServiceTests
         Assert.All(results, metric => Assert.Equal(LocalUser.Key, metric.UserKey));
     }
 
+    [Fact]
+    public async Task RecentMetrics_ProjectsWeeklyTargetAcrossMondayWeek()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        await using var db = CreateDbContext(connection);
+        await db.Database.EnsureCreatedAsync();
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var weekStart = WeeklyLoadCalculator.GetWeekStart(today);
+        db.DailyMetricSnapshots.Add(new DailyMetricSnapshot
+        {
+            UserKey = LocalUser.Key,
+            MetricDate = weekStart,
+            TargetLoad = 90m
+        });
+        if (weekStart != today)
+        {
+            db.DailyMetricSnapshots.Add(new DailyMetricSnapshot
+            {
+                UserKey = LocalUser.Key,
+                MetricDate = today,
+                CardioLoad = 75m
+            });
+        }
+
+        await db.SaveChangesAsync();
+
+        var results = await new MetricQueryService(db).GetRecentMetricsAsync(1);
+
+        var snapshot = Assert.Single(results);
+        Assert.Equal(today, snapshot.MetricDate);
+        Assert.Equal(90m, snapshot.TargetLoad);
+    }
+
     private static HealthMetricsDbContext CreateDbContext(SqliteConnection connection) =>
         new(new DbContextOptionsBuilder<HealthMetricsDbContext>()
             .UseSqlite(connection)

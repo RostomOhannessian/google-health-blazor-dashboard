@@ -38,9 +38,11 @@ integration never requests those speculative endpoints. Google sync never
 writes `CardioLoad`, `TargetLoad`, or `Acwr`; those nullable fields are a
 distinct proprietary manual series edited in the dashboard.
 
-Manual target amounts are user-entered and may be cleared. They are not
-automatically calculated, and are not a Google, Fitbit, or other provider
-recommendation.
+Manual weekly target amounts are user-entered and may be cleared. Each target
+applies from Monday through Sunday; the dashboard associates the saved value
+with the selected week's daily records and projects it across that week for
+display. Targets are not automatically calculated, and are not a Google,
+Fitbit, or other provider recommendation.
 
 After every successful sync, manual save, and demo seed, the app recalculates
 the persisted manual ACWR:
@@ -54,6 +56,10 @@ the persisted manual ACWR:
 - The ratio is `acute / chronic`, rounded to two decimal places, only when all
   28 required daily Cardio Load values exist and chronic load is greater than
   zero. Otherwise the ratio is `null`.
+
+The load chart groups daily Cardio Load into Monday-through-Sunday weeks. It
+plots the weekly sum against the weekly target and uses the latest available
+daily ACWR in each week.
 
 The UI classifies a non-null ratio as **Undertraining** below 0.8, **Optimal
 Zone** from 0.8 through 1.3, **Overreaching** above 1.3 through 1.5, or **High
@@ -69,7 +75,8 @@ Date,RestingHR_bpm,HRV_RMSSD_ms,DailyVO2Max_ml_kg_min,RunVO2Max_ml_kg_min,Manual
 ```
 
 Null fields are emitted as empty CSV cells. The table and cards use an em dash
-for the same missing values.
+for the same missing values. `ManualTargetLoad` is the weekly target projected
+onto each returned day in its Monday-through-Sunday week.
 
 Sleep uses the documented `sleep`,
 `SleepMetadata`, `SleepSummary`, `stagesSummary`, and `SleepStage` shapes.

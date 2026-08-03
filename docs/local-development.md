@@ -43,8 +43,9 @@ tools and operating model, not C# syntax or IDE navigation.
   variables.
 * **Chart.js**: the dashboard's `wwwroot/charts.js` creates the Heart & HRV and
   Manual Load & Training Strain views through JavaScript interop. The load view
-  renders manual Cardio Load bars and a target line; both views recolor axes,
-  grids, legends, and tooltips when the theme changes.
+  renders Monday-starting weekly Cardio Load totals, a weekly target line, and
+  the latest weekly ACWR; both views recolor axes, grids, legends, and tooltips
+  when the theme changes.
 * **Serilog**: the host writes structured local console output and rolling
   JSON files under `logs/health-metrics-.log`.
 * **xUnit**: tests cover models, persistence, Google Health fixtures, and HTTP
@@ -258,12 +259,12 @@ discarding data.
 | Try demo mode | Open the dashboard and choose **Insert demo data (30 days)** |
 | Export metrics | Choose **Export CSV** on the dashboard |
 
-Demo rows include deterministic manual Cardio Load and target values, sleep
-efficiency, deep/REM minutes, and enough history for the latest ACWR values.
-Use the chart toggle to switch between heart/recovery trends and manual load;
-click any snapshot header to sort, including the manual target, ACWR, and
-sleep-efficiency columns. The CSV includes the manual source and locally
-persisted derived values.
+Demo rows include deterministic manual Cardio Load and Monday-starting weekly
+target values, sleep efficiency, deep/REM minutes, and enough history for the
+latest ACWR values. Use the chart toggle to switch between heart/recovery
+trends and weekly manual load; click any snapshot header to sort, including the
+manual target, ACWR, and sleep-efficiency columns. The CSV includes the manual
+source and locally persisted derived values.
 
 Do not add a migration for a query translation fix. The sync-history ordering
 uses its generated identity intentionally and does not change the schema.

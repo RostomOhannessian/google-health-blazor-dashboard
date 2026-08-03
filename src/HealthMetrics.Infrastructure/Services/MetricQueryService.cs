@@ -19,11 +19,44 @@ internal sealed class MetricQueryService(HealthMetricsDbContext dbContext) : IMe
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var cutoff = today.AddDays(1 - dayCount);
 
-        return await dbContext.DailyMetricSnapshots
+        var snapshots = await dbContext.DailyMetricSnapshots
             .AsNoTracking()
             .Where(item => item.UserKey == LocalUser.Key && item.MetricDate >= cutoff)
             .OrderByDescending(item => item.MetricDate)
             .ToListAsync(cancellationToken);
+
+        if (snapshots.Count == 0)
+            return snapshots;
+
+        var earliestWeekStart = WeeklyLoadCalculator.GetWeekStart(snapshots.Min(item => item.MetricDate));
+        var latestDate = snapshots.Max(item => item.MetricDate);
+        var weeklyTargets = await dbContext.DailyMetricSnapshots
+            .AsNoTracking()
+            .Where(item =>
+                item.UserKey == LocalUser.Key
+                && item.MetricDate >= earliestWeekStart
+                && item.MetricDate <= latestDate
+                && item.TargetLoad.HasValue)
+            .OrderBy(item => item.MetricDate)
+            .Select(item => new { item.MetricDate, item.TargetLoad })
+            .ToListAsync(cancellationToken);
+        var targetByWeek = weeklyTargets
+            .GroupBy(item => WeeklyLoadCalculator.GetWeekStart(item.MetricDate))
+            .ToDictionary(
+                group => group.Key,
+                group => group.Last().TargetLoad);
+
+        foreach (var snapshot in snapshots)
+        {
+            if (targetByWeek.TryGetValue(
+                    WeeklyLoadCalculator.GetWeekStart(snapshot.MetricDate),
+                    out var weeklyTarget))
+            {
+                snapshot.TargetLoad = weeklyTarget;
+            }
+        }
+
+        return snapshots;
     }
 
     public async Task<IReadOnlyList<SyncHistoryEntry>> GetRecentSyncHistoryAsync(

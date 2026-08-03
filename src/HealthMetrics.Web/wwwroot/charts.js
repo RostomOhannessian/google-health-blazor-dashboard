@@ -142,12 +142,12 @@ window.HealthCharts = (function () {
 
             if (hasTarget) {
                 datasets.push({
-                    label: "Manual target",
+                    label: "Weekly target",
                     data: targetData,
                     type: "line",
-                    borderColor: "rgba(25, 135, 84, 0.7)",
-                    borderWidth: 1,
-                    pointRadius: 2,
+                    borderColor: "rgb(25, 135, 84)",
+                    backgroundColor: "rgba(25, 135, 84, 0.08)",
+                    tension: 0.3,
                     spanGaps: true,
                     yAxisID: "yLoad"
                 });
@@ -157,10 +157,11 @@ window.HealthCharts = (function () {
                 datasets.push({
                     label: "Manual Cardio Load",
                     data: cardioLoadData,
-                    type: "bar",
-                    backgroundColor: "rgba(111, 66, 193, 0.62)",
+                    type: "line",
+                    backgroundColor: "rgba(111, 66, 193, 0.08)",
                     borderColor: "rgb(111, 66, 193)",
-                    borderWidth: 1,
+                    tension: 0.3,
+                    spanGaps: true,
                     yAxisID: "yLoad"
                 });
             }
@@ -179,7 +180,7 @@ window.HealthCharts = (function () {
             }
 
             charts[canvasId] = new Chart(canvas, {
-                type: "bar",
+                type: "line",
                 data: { labels, datasets },
                 options: {
                     responsive: true,
@@ -201,7 +202,7 @@ window.HealthCharts = (function () {
                     },
                     scales: {
                         x: {
-                            title: { display: false, color: colors.muted },
+                            title: { display: true, text: "Week starting Monday", color: colors.muted },
                             ticks: { color: colors.muted },
                             grid: { color: colors.grid },
                             border: { color: colors.grid }

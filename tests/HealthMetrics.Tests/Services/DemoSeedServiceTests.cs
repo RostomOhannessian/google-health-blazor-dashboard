@@ -131,9 +131,9 @@ public sealed class DemoSeedServiceTests : IAsyncLifetime
         }
 
         Assert.Contains(snapshots, snapshot => snapshot.Acwr is not null);
-        Assert.All(snapshots, snapshot =>
-        {
-            Assert.Equal(snapshot.CardioLoad, snapshot.TargetLoad);
-        });
+        Assert.All(snapshots, snapshot => Assert.NotNull(snapshot.TargetLoad));
+        Assert.All(
+            snapshots.GroupBy(snapshot => WeeklyLoadCalculator.GetWeekStart(snapshot.MetricDate)),
+            week => Assert.Single(week.Select(snapshot => snapshot.TargetLoad).Distinct()));
     }
 }

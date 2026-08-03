@@ -150,14 +150,33 @@ public sealed class HealthEndpointTests
         Assert.Contains("260.50", html);
         Assert.Contains("70.00", html);
         Assert.Contains("120.00", html);
-        Assert.Contains("78.0 / Target: 75.0", html);
+        Assert.Contains("78.0 / Weekly target: 75.0", html);
         Assert.Contains("1.05", html);
         Assert.Contains("Optimal Zone", html);
-        Assert.Contains("Manual Cardio Load and Target Load", html);
+        Assert.Contains("Sat, Jul 18", html);
+        Assert.Contains("border-start", html);
+        Assert.Contains("Cardio Load (Manual)", html);
+        Assert.Contains("Target Load (Manual)", html);
+        Assert.Contains(">ACWR", html);
+        Assert.Contains("Manual Cardio Load and Weekly Target Load", html);
         Assert.Contains("Manual Cardio Load", html);
-        Assert.Contains("Target (load points)", html);
-        Assert.Contains("Manual target", html);
+        Assert.Contains("Weekly Target (load points)", html);
         Assert.Contains("Sleep Efficiency (%)", html);
+    }
+
+    [Fact]
+    public async Task RootDocument_DefaultsDailySnapshotsToNewestDateFirst()
+    {
+        await using var factory = new HealthMetricsWebApplicationFactory(includeOlderMetric: true);
+        var client = factory.CreateClient();
+
+        var html = await client.GetStringAsync("/");
+
+        var newestDateIndex = html.IndexOf("Jul 18", StringComparison.Ordinal);
+        var olderDateIndex = html.IndexOf("Jul 17", StringComparison.Ordinal);
+        Assert.True(newestDateIndex >= 0);
+        Assert.True(olderDateIndex >= 0);
+        Assert.True(newestDateIndex < olderDateIndex);
     }
 
     [Fact]
@@ -172,13 +191,13 @@ public sealed class HealthEndpointTests
         Assert.Contains("<fieldset", html);
         Assert.Contains("Manual load entry", html);
         Assert.Contains("Cardio Load (load points)", html);
-        Assert.Contains("Target (load points)", html);
+        Assert.Contains("Weekly Target (load points)", html);
         Assert.Contains("min=\"0\"", html);
         Assert.Contains("step=\"0.1\"", html);
         Assert.Contains("inputmode=\"decimal\"", html);
         Assert.Contains("manual-target-help", html);
         Assert.Contains("Clear saved values", html);
-        Assert.Contains("They drive the Manual Cardio ACWR calculation only", html);
+        Assert.Contains("the values drive the Manual Cardio ACWR calculation only", html);
     }
 
     [Fact]
@@ -195,7 +214,7 @@ public sealed class HealthEndpointTests
     }
 
     [Fact]
-    public async Task Charts_ExposeDistinctManualAndProviderLoadSeries()
+    public async Task Charts_ExposeManualWeeklyLoadSeries()
     {
         await using var factory = new HealthMetricsWebApplicationFactory();
         var client = factory.CreateClient();
@@ -203,9 +222,11 @@ public sealed class HealthEndpointTests
         var script = await client.GetStringAsync("/charts.js");
 
         Assert.Contains("Manual Cardio Load", script);
-        Assert.Contains("Manual target", script);
+        Assert.Contains("Weekly target", script);
         Assert.Contains("Manual ACWR", script);
         Assert.Contains("yAcwr", script);
+        Assert.Contains("Week starting Monday", script);
+        Assert.DoesNotContain("type: \"bar\"", script);
     }
 
     [Theory]
@@ -247,13 +268,16 @@ public sealed class HealthEndpointTests
     {
         private readonly bool useRealAuthorization;
         private readonly bool requiresReconnect;
+        private readonly bool includeOlderMetric;
 
         public HealthMetricsWebApplicationFactory(
             bool useRealAuthorization = false,
-            bool requiresReconnect = false)
+            bool requiresReconnect = false,
+            bool includeOlderMetric = false)
         {
             this.useRealAuthorization = useRealAuthorization;
             this.requiresReconnect = requiresReconnect;
+            this.includeOlderMetric = includeOlderMetric;
         }
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -297,7 +321,8 @@ public sealed class HealthEndpointTests
                         new FakeHealthAuthorizationService(requiresReconnect));
                 }
                 services.AddSingleton<IHealthSyncService, FakeHealthSyncService>();
-                services.AddSingleton<IMetricQueryService, FakeMetricQueryService>();
+                services.AddSingleton<IMetricQueryService>(
+                    new FakeMetricQueryService(includeOlderMetric));
                 services.AddSingleton<IDemoSeedService, FakeDemoSeedService>();
             });
         }
@@ -338,34 +363,36 @@ public sealed class HealthEndpointTests
             Task.FromResult(new SyncResult(dayCount, dayCount, DateTimeOffset.UtcNow));
     }
 
-    private sealed class FakeMetricQueryService : IMetricQueryService
+    private sealed class FakeMetricQueryService(bool includeOlderMetric) : IMetricQueryService
     {
         public Task<IReadOnlyList<DailyMetricSnapshot>> GetRecentMetricsAsync(int dayCount, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<DailyMetricSnapshot>>(
-            [
-                new DailyMetricSnapshot
-                {
-                    UserKey = LocalUser.Key,
-                    MetricDate = new DateOnly(2026, 7, 18),
-                    RestingHeartRateBpm = 58,
-                    HrvRmssdMilliseconds = 42.5m,
-                    DailyVo2MaxMlKgMin = 46.8m,
-                    RunVo2MaxMlKgMin = 47.2m,
-                    CardioLoad = 78m,
-                    TargetLoad = 75m,
-                    Acwr = 1.05m,
-                    SleepEfficiency = 91m,
-                    DeepSleepMinutes = 85,
-                    RemSleepMinutes = 105,
-                    ConsumedCaloriesKcal = 2200,
-                    CarbohydratesGrams = 260.5m,
-                    FatGrams = 70m,
-                    ProteinGrams = 120m
-                }
-            ]);
+            includeOlderMetric
+                ? [CreateSnapshot(new DateOnly(2026, 7, 18)), CreateSnapshot(new DateOnly(2026, 7, 17))]
+                : [CreateSnapshot(new DateOnly(2026, 7, 18))]);
 
         public Task<IReadOnlyList<SyncHistoryEntry>> GetRecentSyncHistoryAsync(int count = 10, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<SyncHistoryEntry>>([]);
+
+        private static DailyMetricSnapshot CreateSnapshot(DateOnly metricDate) => new()
+        {
+            UserKey = LocalUser.Key,
+            MetricDate = metricDate,
+            RestingHeartRateBpm = 58,
+            HrvRmssdMilliseconds = 42.5m,
+            DailyVo2MaxMlKgMin = 46.8m,
+            RunVo2MaxMlKgMin = 47.2m,
+            CardioLoad = 78m,
+            TargetLoad = 75m,
+            Acwr = 1.05m,
+            SleepEfficiency = 91m,
+            DeepSleepMinutes = 85,
+            RemSleepMinutes = 105,
+            ConsumedCaloriesKcal = 2200,
+            CarbohydratesGrams = 260.5m,
+            FatGrams = 70m,
+            ProteinGrams = 120m
+        };
     }
 
     private sealed class FakeDemoSeedService : IDemoSeedService

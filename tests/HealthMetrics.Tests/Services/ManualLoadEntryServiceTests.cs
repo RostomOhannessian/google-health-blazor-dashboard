@@ -48,6 +48,30 @@ public sealed class ManualLoadEntryServiceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task SaveAsync_StoresOnlyOneTargetWithinTheMondayWeek()
+    {
+        var monday = new DateOnly(2026, 8, 3);
+        var friday = monday.AddDays(4);
+        var selectedDate = monday.AddDays(2);
+        dbContext.DailyMetricSnapshots.AddRange(
+            new DailyMetricSnapshot { MetricDate = monday, TargetLoad = 70m },
+            new DailyMetricSnapshot { MetricDate = friday, TargetLoad = 75m });
+        await dbContext.SaveChangesAsync();
+
+        var result = await new ManualLoadEntryService(dbContext).SaveAsync(
+            new ManualLoadEntry(selectedDate, null, 80m));
+
+        var stored = await dbContext.DailyMetricSnapshots
+            .OrderBy(snapshot => snapshot.MetricDate)
+            .ToListAsync();
+        Assert.True(result.Succeeded);
+        Assert.Equal([monday, selectedDate, friday], stored.Select(snapshot => snapshot.MetricDate));
+        Assert.Null(stored[0].TargetLoad);
+        Assert.Equal(80m, stored[1].TargetLoad);
+        Assert.Null(stored[2].TargetLoad);
+    }
+
+    [Fact]
     public async Task SaveAsync_ClearsNullableManualFieldsWithoutDeletingProviderFields()
     {
         var date = new DateOnly(2026, 8, 2);
@@ -91,7 +115,7 @@ public sealed class ManualLoadEntryServiceTests : IAsyncLifetime
 
     [Theory]
     [InlineData(-1d, null, "Manual Cardio Load cannot be negative.")]
-    [InlineData(null, -1d, "Manual target cannot be negative.")]
+    [InlineData(null, -1d, "Weekly target cannot be negative.")]
     public async Task SaveAsync_RejectsInvalidManualValues(
         double? cardioLoad,
         double? targetLoad,

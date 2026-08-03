@@ -371,6 +371,9 @@ public sealed class HealthEndpointTests
                 ? [CreateSnapshot(new DateOnly(2026, 7, 18)), CreateSnapshot(new DateOnly(2026, 7, 17))]
                 : [CreateSnapshot(new DateOnly(2026, 7, 18))]);
 
+        public Task<IReadOnlyList<DailyMetricSnapshot>> GetAllMetricsAsync(CancellationToken cancellationToken = default) =>
+            GetRecentMetricsAsync(365, cancellationToken);
+
         public Task<IReadOnlyList<SyncHistoryEntry>> GetRecentSyncHistoryAsync(int count = 10, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<SyncHistoryEntry>>([]);
 

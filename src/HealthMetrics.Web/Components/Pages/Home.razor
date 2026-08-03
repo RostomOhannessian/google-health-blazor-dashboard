@@ -367,6 +367,7 @@
 @code {
     private readonly CancellationTokenSource _cts = new();
     private readonly List<DailyMetricSnapshot> metrics = [];
+    private readonly List<DailyMetricSnapshot> loadHistory = [];
     private readonly List<SyncHistoryEntry> syncHistory = [];
     private HealthConnectionStatus? connectionStatus;
     private MetricSummary? summary;
@@ -389,7 +390,7 @@
         metrics.Any(m => m.RestingHeartRateBpm.HasValue || m.HrvRmssdMilliseconds.HasValue);
 
     private bool HasLoadMetrics =>
-        metrics.Any(m => m.CardioLoad.HasValue
+        loadHistory.Any(m => m.CardioLoad.HasValue
             || m.TargetLoad.HasValue
             || m.Acwr.HasValue);
 
@@ -428,12 +429,14 @@
         if (chartNeedsRender && chartHasData)
         {
             chartNeedsRender = false;
-            var ordered = metrics.OrderBy(m => m.MetricDate).ToList();
+            var ordered = (chartMode == ChartMode.Load ? loadHistory : metrics)
+                .OrderBy(m => m.MetricDate)
+                .ToList();
             if (chartMode == ChartMode.Load)
             {
                 var weeklyLoad = WeeklyLoadCalculator.Summarize(ordered);
                 var labels = weeklyLoad
-                    .Select(week => $"Week of {week.WeekStart:MMM d}")
+                    .Select(week => $"Week of {week.WeekStart:MMM d, yyyy}")
                     .ToArray();
                 var cardioLoadData = weeklyLoad.Select(week => (object?)week.CardioLoad).ToArray();
                 var targetData = weeklyLoad.Select(week => (object?)week.TargetLoad).ToArray();
@@ -494,8 +497,11 @@
             lastError = null;
             connectionStatus = await OAuthService.GetConnectionStatusAsync(_cts.Token);
             var loaded = await MetricQueryService.GetRecentMetricsAsync(selectedDays, _cts.Token);
+            var loadedLoadHistory = await MetricQueryService.GetAllMetricsAsync(_cts.Token);
             metrics.Clear();
             metrics.AddRange(loaded);
+            loadHistory.Clear();
+            loadHistory.AddRange(loadedLoadHistory);
             if (!HasHeartMetrics && HasLoadMetrics)
                 chartMode = ChartMode.Load;
             else if (chartMode == ChartMode.Load && !HasLoadMetrics)
@@ -557,10 +563,10 @@
 
     private void ResetManualLoadInputs()
     {
-        var snapshot = metrics.SingleOrDefault(metric => metric.MetricDate == manualLoadForm.MetricDate);
+        var snapshot = loadHistory.SingleOrDefault(metric => metric.MetricDate == manualLoadForm.MetricDate);
         var weekStart = WeeklyLoadCalculator.GetWeekStart(manualLoadForm.MetricDate);
         manualLoadForm.CardioLoad = snapshot?.CardioLoad;
-        manualLoadForm.TargetLoad = metrics
+        manualLoadForm.TargetLoad = loadHistory
             .Where(metric => WeeklyLoadCalculator.GetWeekStart(metric.MetricDate) == weekStart)
             .OrderByDescending(metric => metric.MetricDate)
             .Select(metric => metric.TargetLoad)

@@ -104,6 +104,47 @@ public sealed class MetricQueryServiceTests
         Assert.Equal(90m, snapshot.TargetLoad);
     }
 
+    [Fact]
+    public async Task AllMetrics_ReturnsHistoryBeyondRecentRange()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        await using var db = CreateDbContext(connection);
+        await db.Database.EnsureCreatedAsync();
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var olderDate = today.AddDays(-400);
+        db.DailyMetricSnapshots.AddRange(
+            new DailyMetricSnapshot
+            {
+                UserKey = LocalUser.Key,
+                MetricDate = olderDate,
+                CardioLoad = 44m,
+                TargetLoad = 120m
+            },
+            new DailyMetricSnapshot
+            {
+                UserKey = LocalUser.Key,
+                MetricDate = today,
+                CardioLoad = 75m,
+                TargetLoad = 180m
+            },
+            new DailyMetricSnapshot
+            {
+                UserKey = "another-user",
+                MetricDate = olderDate,
+                CardioLoad = 99m
+            });
+        await db.SaveChangesAsync();
+
+        var results = await new MetricQueryService(db).GetAllMetricsAsync();
+
+        Assert.Equal([today, olderDate], results.Select(metric => metric.MetricDate));
+        Assert.Equal(44m, results[1].CardioLoad);
+        Assert.Equal(120m, results[1].TargetLoad);
+        Assert.All(results, metric => Assert.Equal(LocalUser.Key, metric.UserKey));
+    }
+
     private static HealthMetricsDbContext CreateDbContext(SqliteConnection connection) =>
         new(new DbContextOptionsBuilder<HealthMetricsDbContext>()
             .UseSqlite(connection)

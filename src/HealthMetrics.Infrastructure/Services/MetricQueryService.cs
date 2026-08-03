@@ -25,6 +25,25 @@ internal sealed class MetricQueryService(HealthMetricsDbContext dbContext) : IMe
             .OrderByDescending(item => item.MetricDate)
             .ToListAsync(cancellationToken);
 
+        return await ProjectWeeklyTargetsAsync(snapshots, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<DailyMetricSnapshot>> GetAllMetricsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var snapshots = await dbContext.DailyMetricSnapshots
+            .AsNoTracking()
+            .Where(item => item.UserKey == LocalUser.Key)
+            .OrderByDescending(item => item.MetricDate)
+            .ToListAsync(cancellationToken);
+
+        return await ProjectWeeklyTargetsAsync(snapshots, cancellationToken);
+    }
+
+    private async Task<IReadOnlyList<DailyMetricSnapshot>> ProjectWeeklyTargetsAsync(
+        List<DailyMetricSnapshot> snapshots,
+        CancellationToken cancellationToken)
+    {
         if (snapshots.Count == 0)
             return snapshots;
 

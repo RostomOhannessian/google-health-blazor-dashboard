@@ -38,7 +38,7 @@ internal sealed class ManualLoadEntryService(HealthMetricsDbContext dbContext) :
                 && item.MetricDate <= weekEnd)
             .ToListAsync(cancellationToken);
         foreach (var weeklySnapshot in weeklySnapshots)
-            weeklySnapshot.TargetLoad = null;
+            weeklySnapshot.TargetLoad = entry.TargetLoad;
 
         snapshot.CardioLoad = entry.CardioLoad;
         snapshot.TargetLoad = entry.TargetLoad;

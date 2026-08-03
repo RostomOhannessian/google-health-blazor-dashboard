@@ -48,7 +48,7 @@ public sealed class ManualLoadEntryServiceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task SaveAsync_StoresOnlyOneTargetWithinTheMondayWeek()
+    public async Task SaveAsync_UpdatesTargetAcrossTheMondayWeek()
     {
         var monday = new DateOnly(2026, 8, 3);
         var friday = monday.AddDays(4);
@@ -66,9 +66,9 @@ public sealed class ManualLoadEntryServiceTests : IAsyncLifetime
             .ToListAsync();
         Assert.True(result.Succeeded);
         Assert.Equal([monday, selectedDate, friday], stored.Select(snapshot => snapshot.MetricDate));
-        Assert.Null(stored[0].TargetLoad);
+        Assert.Equal(80m, stored[0].TargetLoad);
         Assert.Equal(80m, stored[1].TargetLoad);
-        Assert.Null(stored[2].TargetLoad);
+        Assert.Equal(80m, stored[2].TargetLoad);
     }
 
     [Fact]

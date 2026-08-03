@@ -52,10 +52,11 @@ HealthMetrics.Tests
 `ManualLoadEntryService` validates nullable user-entered manual Cardio Load and
 weekly target amount, preserves synced fields, and recalculates only the manual
 ratio. Weekly targets are associated with Monday-through-Sunday weeks and are
-projected across the displayed days. The table exposes manual values and the
-ratio with `—` fallbacks. Chart.js keeps Heart & HRV separate from the load view,
-which sums daily manual Cardio Load by Monday-starting week and plots the weekly
-target and latest available manual ratio on the right axis.
+written to every existing daily record in the selected week, then projected
+across displayed days. The table exposes manual values and the ratio with `—`
+fallbacks. Chart.js keeps Heart & HRV separate from the load view, which loads
+the full local history, sums daily manual Cardio Load by Monday-starting week,
+and plots the weekly target and latest available manual ratio on the right axis.
 The CSV endpoint exports the persisted source and derived values, including
 deep/REM minutes, with invariant-culture numeric formatting.
 

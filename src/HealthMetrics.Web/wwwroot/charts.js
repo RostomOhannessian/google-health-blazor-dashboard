@@ -7,7 +7,9 @@ window.HealthCharts = (function () {
             text: style.getPropertyValue("--bs-body-color").trim(),
             muted: style.getPropertyValue("--bs-secondary-color").trim(),
             grid: style.getPropertyValue("--bs-border-color").trim(),
-            tooltipBackground: style.getPropertyValue("--bs-tertiary-bg").trim()
+            tooltipBackground: style.getPropertyValue("--bs-tertiary-bg").trim(),
+            weekBand: style.getPropertyValue("--hm-chart-week-band").trim(),
+            weekSeparator: style.getPropertyValue("--hm-chart-week-separator").trim()
         };
     }
 
@@ -35,6 +37,86 @@ window.HealthCharts = (function () {
 
         chart.update();
     }
+
+    function weekRanges(chart, weekStarts) {
+        const chartArea = chart.chartArea;
+        const xScale = chart.scales?.x;
+        const labels = chart.data.labels;
+        if (!chartArea
+            || !xScale
+            || !Array.isArray(weekStarts)
+            || !Array.isArray(labels)
+            || weekStarts.length === 0
+            || weekStarts.length !== labels.length) {
+            return [];
+        }
+
+        const ranges = [];
+        let rangeStart = 0;
+        let currentWeek = weekStarts[0];
+
+        for (let index = 1; index <= weekStarts.length; index++) {
+            if (index < weekStarts.length && weekStarts[index] === currentWeek) {
+                continue;
+            }
+
+            const left = rangeStart === 0
+                ? chartArea.left
+                : (xScale.getPixelForValue(rangeStart - 1) + xScale.getPixelForValue(rangeStart)) / 2;
+            const right = index === weekStarts.length
+                ? chartArea.right
+                : (xScale.getPixelForValue(index - 1) + xScale.getPixelForValue(index)) / 2;
+            ranges.push({ left, right });
+
+            rangeStart = index;
+            currentWeek = weekStarts[index];
+        }
+
+        return ranges;
+    }
+
+    const loadWeekBandsPlugin = {
+        id: "loadWeekBands",
+
+        beforeDraw(chart, _args, options) {
+            const ranges = weekRanges(chart, options?.weekStarts);
+            if (ranges.length === 0) return;
+
+            const colors = themeColors();
+            const { ctx, chartArea } = chart;
+            ctx.save();
+            ranges.forEach((range, index) => {
+                if (index % 2 === 0) {
+                    ctx.fillStyle = colors.weekBand;
+                    ctx.fillRect(
+                        range.left,
+                        chartArea.top,
+                        range.right - range.left,
+                        chartArea.bottom - chartArea.top);
+                }
+            });
+            ctx.restore();
+        },
+
+        afterDraw(chart, _args, options) {
+            const ranges = weekRanges(chart, options?.weekStarts);
+            if (ranges.length < 2) return;
+
+            const colors = themeColors();
+            const { ctx, chartArea } = chart;
+            ctx.save();
+            ctx.strokeStyle = colors.weekSeparator;
+            ctx.lineWidth = 2.5;
+            ctx.setLineDash([]);
+            ranges.slice(1).forEach(range => {
+                ctx.beginPath();
+                ctx.moveTo(range.left, chartArea.top);
+                ctx.lineTo(range.left, chartArea.bottom);
+                ctx.stroke();
+            });
+            ctx.restore();
+        }
+    };
 
     window.addEventListener("healthmetrics:themechange", () => {
         Object.values(charts).forEach(applyTheme);
@@ -127,18 +209,38 @@ window.HealthCharts = (function () {
             });
         },
 
-        renderLoad(canvasId, labels, cardioLoadData, targetData, manualAcwrData) {
+        renderLoad(
+            canvasId,
+            labels,
+            dailyCardioLoadData,
+            cumulativeCardioLoadData,
+            targetData,
+            manualAcwrData,
+            weekStarts) {
             if (charts[canvasId]) {
                 charts[canvasId].destroy();
             }
             const canvas = document.getElementById(canvasId);
             if (!canvas) return;
 
-            const hasCardioLoad = cardioLoadData.some(v => v !== null);
+            const hasDailyCardioLoad = dailyCardioLoadData.some(v => v !== null);
+            const hasCumulativeCardioLoad = cumulativeCardioLoadData.some(v => v !== null);
             const hasTarget = targetData.some(v => v !== null);
             const hasManualAcwr = manualAcwrData.some(v => v !== null);
             const colors = themeColors();
             const datasets = [];
+
+            if (hasDailyCardioLoad) {
+                datasets.push({
+                    label: "Daily Cardio Load",
+                    data: dailyCardioLoadData,
+                    type: "bar",
+                    backgroundColor: "rgba(111, 66, 193, 0.32)",
+                    borderColor: "rgb(111, 66, 193)",
+                    borderWidth: 1,
+                    yAxisID: "yLoad"
+                });
+            }
 
             if (hasTarget) {
                 datasets.push({
@@ -153,15 +255,18 @@ window.HealthCharts = (function () {
                 });
             }
 
-            if (hasCardioLoad) {
+            if (hasCumulativeCardioLoad) {
                 datasets.push({
-                    label: "Manual Cardio Load",
-                    data: cardioLoadData,
+                    label: "Weekly cumulative load",
+                    data: cumulativeCardioLoadData,
                     type: "line",
                     backgroundColor: "rgba(111, 66, 193, 0.08)",
                     borderColor: "rgb(111, 66, 193)",
-                    tension: 0.3,
-                    spanGaps: true,
+                    borderWidth: 3,
+                    pointRadius: 3,
+                    pointHoverRadius: 5,
+                    tension: 0.25,
+                    spanGaps: false,
                     yAxisID: "yLoad"
                 });
             }
@@ -182,10 +287,12 @@ window.HealthCharts = (function () {
             charts[canvasId] = new Chart(canvas, {
                 type: "line",
                 data: { labels, datasets },
+                plugins: [loadWeekBandsPlugin],
                 options: {
                     responsive: true,
                     interaction: { mode: "index", intersect: false },
                     plugins: {
+                        loadWeekBands: { weekStarts },
                         legend: {
                             position: "top",
                             labels: {
@@ -202,7 +309,7 @@ window.HealthCharts = (function () {
                     },
                     scales: {
                         x: {
-                            title: { display: true, text: "Week starting Monday", color: colors.muted },
+                            title: { display: true, text: "Daily values (weeks start Monday)", color: colors.muted },
                             ticks: { color: colors.muted },
                             grid: { color: colors.grid },
                             border: { color: colors.grid }
@@ -211,7 +318,7 @@ window.HealthCharts = (function () {
                             type: "linear",
                             position: "left",
                             beginAtZero: true,
-                            title: { display: true, text: "Load", color: colors.muted },
+                            title: { display: true, text: "Load (daily / cumulative)", color: colors.muted },
                             ticks: { color: colors.muted },
                             grid: { color: colors.grid },
                             border: { color: colors.grid }

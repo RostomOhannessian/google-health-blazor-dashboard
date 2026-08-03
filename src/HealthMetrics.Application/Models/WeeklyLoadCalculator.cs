@@ -6,12 +6,57 @@ public sealed record WeeklyLoadSummary(
     decimal? TargetLoad,
     decimal? Acwr);
 
+public sealed record DailyLoadPoint(
+    DateOnly MetricDate,
+    DateOnly WeekStart,
+    decimal? CardioLoad,
+    decimal? CumulativeCardioLoad,
+    decimal? TargetLoad,
+    decimal? Acwr);
+
 public static class WeeklyLoadCalculator
 {
     public static DateOnly GetWeekStart(DateOnly date)
     {
         var daysSinceMonday = ((int)date.DayOfWeek + 6) % 7;
         return date.AddDays(-daysSinceMonday);
+    }
+
+    public static IReadOnlyList<DailyLoadPoint> BuildDailySeries(
+        IEnumerable<DailyMetricSnapshot> snapshots)
+    {
+        var ordered = snapshots.OrderBy(snapshot => snapshot.MetricDate).ToList();
+        var points = new List<DailyLoadPoint>(ordered.Count);
+        DateOnly? currentWeekStart = null;
+        var cumulativeCardioLoad = 0m;
+        var hasCardioLoad = false;
+
+        foreach (var snapshot in ordered)
+        {
+            var weekStart = GetWeekStart(snapshot.MetricDate);
+            if (currentWeekStart != weekStart)
+            {
+                currentWeekStart = weekStart;
+                cumulativeCardioLoad = 0m;
+                hasCardioLoad = false;
+            }
+
+            if (snapshot.CardioLoad.HasValue)
+            {
+                cumulativeCardioLoad += snapshot.CardioLoad.Value;
+                hasCardioLoad = true;
+            }
+
+            points.Add(new DailyLoadPoint(
+                snapshot.MetricDate,
+                weekStart,
+                snapshot.CardioLoad,
+                hasCardioLoad ? cumulativeCardioLoad : null,
+                snapshot.TargetLoad,
+                snapshot.Acwr));
+        }
+
+        return points;
     }
 
     public static IReadOnlyList<WeeklyLoadSummary> Summarize(

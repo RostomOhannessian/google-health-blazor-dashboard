@@ -4,6 +4,8 @@
     --hm-error-surface: #fff3cd;
     --hm-shadow: rgba(0, 0, 0, 0.2);
     --hm-backdrop: rgba(0, 0, 0, 0.4);
+    --hm-chart-week-band: rgba(13, 110, 253, 0.06);
+    --hm-chart-week-separator: rgba(13, 110, 253, 0.72);
 }
 
 [data-bs-theme="dark"] {
@@ -12,6 +14,8 @@
     --hm-error-surface: #4d3210;
     --hm-shadow: rgba(0, 0, 0, 0.55);
     --hm-backdrop: rgba(0, 0, 0, 0.7);
+    --hm-chart-week-band: rgba(147, 197, 253, 0.1);
+    --hm-chart-week-separator: rgba(147, 197, 253, 0.82);
 }
 
 html, body {

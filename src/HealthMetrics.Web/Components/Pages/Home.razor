@@ -245,7 +245,7 @@
 {
     <div class="card mb-4">
         <div class="card-header d-flex align-items-center justify-content-between gap-2 flex-wrap">
-            <span class="fw-semibold">@(chartMode == ChartMode.Load ? "Weekly Cardio Load & training strain" : "Heart rate & HRV trend")</span>
+            <span class="fw-semibold">@(chartMode == ChartMode.Load ? "Daily Cardio Load & weekly accumulation" : "Heart rate & HRV trend")</span>
             <div class="btn-group btn-group-sm" role="group" aria-label="Chart metric">
                 <button type="button" class="btn @(chartMode == ChartMode.Heart ? "btn-primary" : "btn-outline-primary")" @onclick="@(() => SetChartModeAsync(ChartMode.Heart))" disabled="@(!HasHeartMetrics)">Heart &amp; HRV</button>
                 <button type="button" class="btn @(chartMode == ChartMode.Load ? "btn-primary" : "btn-outline-primary")" @onclick="@(() => SetChartModeAsync(ChartMode.Load))" disabled="@(!HasLoadMetrics)">Load</button>
@@ -450,20 +450,24 @@
                 .ToList();
             if (chartMode == ChartMode.Load)
             {
-                var weeklyLoad = WeeklyLoadCalculator.Summarize(ordered);
-                var labels = weeklyLoad
-                    .Select(week => $"Week of {week.WeekStart:MMM d, yyyy}")
+                var dailyLoad = WeeklyLoadCalculator.BuildDailySeries(ordered);
+                var labels = dailyLoad
+                    .Select(day => day.MetricDate.ToString("ddd, MMM d"))
                     .ToArray();
-                var cardioLoadData = weeklyLoad.Select(week => (object?)week.CardioLoad).ToArray();
-                var targetData = weeklyLoad.Select(week => (object?)week.TargetLoad).ToArray();
-                var manualAcwrData = weeklyLoad.Select(week => (object?)week.Acwr).ToArray();
+                var dailyCardioLoadData = dailyLoad.Select(day => (object?)day.CardioLoad).ToArray();
+                var cumulativeCardioLoadData = dailyLoad.Select(day => (object?)day.CumulativeCardioLoad).ToArray();
+                var targetData = dailyLoad.Select(day => (object?)day.TargetLoad).ToArray();
+                var manualAcwrData = dailyLoad.Select(day => (object?)day.Acwr).ToArray();
+                var weekStarts = dailyLoad.Select(day => day.WeekStart.ToString("yyyy-MM-dd")).ToArray();
                 await JS.InvokeVoidAsync(
                     "HealthCharts.renderLoad",
                     "metricsChart",
                     labels,
-                    cardioLoadData,
+                    dailyCardioLoadData,
+                    cumulativeCardioLoadData,
                     targetData,
-                    manualAcwrData);
+                    manualAcwrData,
+                    weekStarts);
             }
             else
             {

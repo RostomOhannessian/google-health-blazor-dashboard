@@ -216,19 +216,21 @@ public sealed class HealthEndpointTests
     }
 
     [Fact]
-    public async Task Charts_ExposeManualWeeklyLoadSeries()
+    public async Task Charts_ExposeDailyAndWeeklyLoadSeries()
     {
         await using var factory = new HealthMetricsWebApplicationFactory();
         var client = factory.CreateClient();
 
         var script = await client.GetStringAsync("/charts.js");
 
-        Assert.Contains("Manual Cardio Load", script);
+        Assert.Contains("Daily Cardio Load", script);
+        Assert.Contains("Weekly cumulative load", script);
         Assert.Contains("Weekly target", script);
         Assert.Contains("Manual ACWR", script);
         Assert.Contains("yAcwr", script);
-        Assert.Contains("Week starting Monday", script);
-        Assert.DoesNotContain("type: \"bar\"", script);
+        Assert.Contains("Daily values (weeks start Monday)", script);
+        Assert.Contains("type: \"bar\"", script);
+        Assert.Contains("loadWeekBands", script);
     }
 
     [Theory]

@@ -28,3 +28,11 @@
 .bg-orange {
     background-color: #fd7e14 !important;
 }
+
+.manual-load-cell {
+    cursor: pointer;
+}
+
+.manual-load-cell:hover {
+    background-color: var(--bs-tertiary-bg);
+}

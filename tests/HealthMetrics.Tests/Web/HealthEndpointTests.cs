@@ -159,6 +159,7 @@ public sealed class HealthEndpointTests
         Assert.Contains("Target Load (Manual)", html);
         Assert.Contains(">ACWR", html);
         Assert.Contains("Manual Cardio Load", html);
+        Assert.Contains("Double-click to edit manual load", html);
         Assert.Contains("Sleep Efficiency (%)", html);
     }
 

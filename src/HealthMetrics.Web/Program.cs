@@ -171,7 +171,7 @@ try
         var metrics = await metricQueryService.GetRecentMetricsAsync(requestedDays, cancellationToken);
 
         var sb = new StringBuilder();
-        sb.AppendLine("Date,RestingHR_bpm,HRV_RMSSD_ms,DailyVO2Max_ml_kg_min,RunVO2Max_ml_kg_min,CardioLoad,TargetLoadMin,TargetLoadMax,ACWR,SleepEfficiency_pct,DeepSleep_min,RemSleep_min,Calories_kcal,Carbs_g,Fat_g,Protein_g");
+        sb.AppendLine("Date,RestingHR_bpm,HRV_RMSSD_ms,DailyVO2Max_ml_kg_min,RunVO2Max_ml_kg_min,ActiveZoneMinutes,LocalAzmTargetMin,LocalAzmTargetMax,ACWR,SleepEfficiency_pct,DeepSleep_min,RemSleep_min,Calories_kcal,Carbs_g,Fat_g,Protein_g");
         foreach (var m in metrics.OrderBy(m => m.MetricDate))
         {
             sb.AppendLine(string.Create(CultureInfo.InvariantCulture,

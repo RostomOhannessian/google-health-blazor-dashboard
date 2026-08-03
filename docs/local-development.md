@@ -42,8 +42,8 @@ tools and operating model, not C# syntax or IDE navigation.
   cards, buttons, tables, accessibility states, and Bootstrap light/dark
   variables.
 * **Chart.js**: the dashboard's `wwwroot/charts.js` creates the Heart & HRV and
-  Cardio & Load Strain views through JavaScript interop. The load view renders
-  cardio-load bars and fills the area between target min/max datasets; both
+  AZM & Training Strain views through JavaScript interop. The load view renders
+  Active Zone Minutes bars and fills the area between local target min/max datasets; both
   views recolor axes, grids, legends, and tooltips when the theme changes.
 * **Serilog**: the host writes structured local console output and rolling
   JSON files under `logs/health-metrics-.log`.
@@ -85,8 +85,9 @@ The Google path is:
 4. The callback validates state, exchanges the code, fetches the Google user
    identity, and encrypts tokens with ASP.NET Core Data Protection.
 5. A sync obtains a valid access token, requests the configured date range,
-   merges `(UserKey, MetricDate)` rows, recalculates complete-window ACWR values
-   from local cardio-load history, and records sync history.
+   merges `(UserKey, MetricDate)` rows, recalculates local AZM reference ranges
+   and complete-window ACWR values from local AZM history, and records sync
+   history.
 6. Metric queries read only the local user and the dashboard renders the
    returned snapshots.
 
@@ -257,12 +258,12 @@ discarding data.
 | Try demo mode | Open the dashboard and choose **Insert demo data (30 days)** |
 | Export metrics | Choose **Export CSV** on the dashboard |
 
-Demo rows include deterministic cardio load, target-load bounds, sleep
-efficiency, deep/REM minutes, and enough history for the latest ACWR values.
-Use the chart toggle to switch between heart/recovery trends and load strain;
-click any snapshot header to sort, including the new cardio, target, ACWR, and
-sleep-efficiency columns. The CSV includes the source load/sleep fields and
-the locally persisted ACWR value.
+Demo rows include deterministic Active Zone Minute values, locally calculated
+AZM reference ranges, sleep efficiency, deep/REM minutes, and enough history
+for the latest ACWR values. Use the chart toggle to switch between
+heart/recovery trends and AZM strain; click any snapshot header to sort,
+including AZM, local target, ACWR, and sleep-efficiency columns. The CSV
+includes the AZM source field and locally persisted derived values.
 
 Do not add a migration for a query translation fix. The sync-history ordering
 uses its generated identity intentionally and does not change the schema.

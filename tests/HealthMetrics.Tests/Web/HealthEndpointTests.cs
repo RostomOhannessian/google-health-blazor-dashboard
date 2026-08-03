@@ -71,7 +71,7 @@ public sealed class HealthEndpointTests
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("text/csv", response.Content.Headers.ContentType!.MediaType);
-        Assert.StartsWith("Date,RestingHR_bpm,HRV_RMSSD_ms,DailyVO2Max_ml_kg_min,RunVO2Max_ml_kg_min,CardioLoad,TargetLoadMin,TargetLoadMax,ACWR,SleepEfficiency_pct,DeepSleep_min,RemSleep_min,Calories_kcal,Carbs_g,Fat_g,Protein_g", csv);
+        Assert.StartsWith("Date,RestingHR_bpm,HRV_RMSSD_ms,DailyVO2Max_ml_kg_min,RunVO2Max_ml_kg_min,ActiveZoneMinutes,LocalAzmTargetMin,LocalAzmTargetMax,ACWR,SleepEfficiency_pct,DeepSleep_min,RemSleep_min,Calories_kcal,Carbs_g,Fat_g,Protein_g", csv);
         Assert.DoesNotContain("Sodium", csv);
         Assert.DoesNotContain("Fiber", csv);
     }
@@ -148,12 +148,13 @@ public sealed class HealthEndpointTests
         Assert.Contains("260.50", html);
         Assert.Contains("70.00", html);
         Assert.Contains("120.00", html);
-        Assert.Contains("78.0 / Target:", html);
+        Assert.Contains("78.0 / Local range:", html);
         Assert.Contains("60.0", html);
         Assert.Contains("90.0", html);
         Assert.Contains("1.05", html);
         Assert.Contains("Optimal Zone", html);
-        Assert.Contains("Cardio Load", html);
+        Assert.Contains("Daily Active Zone Minutes (AZM)", html);
+        Assert.Contains("Local AZM Target", html);
         Assert.Contains("Sleep Efficiency (%)", html);
     }
 

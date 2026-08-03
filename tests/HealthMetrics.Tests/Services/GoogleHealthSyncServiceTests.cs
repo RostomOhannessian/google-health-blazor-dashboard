@@ -103,8 +103,8 @@ public sealed class GoogleHealthSyncServiceTests : IAsyncLifetime
         Assert.Equal(46.0m, stored.DailyVo2MaxMlKgMin);
         Assert.Equal(47.0m, stored.RunVo2MaxMlKgMin);
         Assert.Equal(78m, stored.CardioLoad);
-        Assert.Equal(60m, stored.TargetLoadMin);
-        Assert.Equal(90m, stored.TargetLoadMax);
+        Assert.Null(stored.TargetLoadMin);
+        Assert.Null(stored.TargetLoadMax);
         Assert.Equal(91m, stored.SleepEfficiency);
         Assert.Equal(85, stored.DeepSleepMinutes);
         Assert.Equal(105, stored.RemSleepMinutes);
@@ -157,13 +157,17 @@ public sealed class GoogleHealthSyncServiceTests : IAsyncLifetime
         var handler = new StubHandler(req =>
         {
             var path = req.RequestUri!.ToString();
-            if (path.Contains("daily-cardio-load"))
+            if (path.Contains("active-zone-minutes"))
                 return Json($$$"""
                     {
-                      "dataPoints": [
+                      "dailyRollupDataPoints": [
                         {
-                          "date": {"year":{{{today.Year}}},"month":{{{today.Month}}},"day":{{{today.Day}}}},
-                          "value": {"cardioLoad": 82, "targetLoad": {"min": 60, "max": 95}}
+                          "civilStartTime": {"date": {"year":{{{today.Year}}},"month":{{{today.Month}}},"day":{{{today.Day}}}}},
+                          "activeZoneMinutes": {
+                            "sumInFatBurnHeartZone": 12,
+                            "sumInCardioHeartZone": 40,
+                            "sumInPeakHeartZone": 30
+                          }
                         }
                       ]
                     }
@@ -206,8 +210,8 @@ public sealed class GoogleHealthSyncServiceTests : IAsyncLifetime
 
         var stored = await _dbContext.DailyMetricSnapshots.SingleAsync();
         Assert.Equal(82m, stored.CardioLoad);
-        Assert.Equal(60m, stored.TargetLoadMin);
-        Assert.Equal(95m, stored.TargetLoadMax);
+        Assert.Null(stored.TargetLoadMin);
+        Assert.Null(stored.TargetLoadMax);
         Assert.Equal(88m, stored.SleepEfficiency);
         Assert.Equal(70, stored.DeepSleepMinutes);
         Assert.Equal(100, stored.RemSleepMinutes);
@@ -227,13 +231,17 @@ public sealed class GoogleHealthSyncServiceTests : IAsyncLifetime
 
         var handler = new StubHandler(req =>
         {
-            if (req.RequestUri!.ToString().Contains("daily-cardio-load"))
+            if (req.RequestUri!.ToString().Contains("active-zone-minutes"))
                 return Json($$$"""
                     {
-                      "dataPoints": [
+                      "dailyRollupDataPoints": [
                         {
-                          "date": {"year":{{{today.Year}}},"month":{{{today.Month}}},"day":{{{today.Day}}}},
-                          "value": {"cardioLoad": 110}
+                          "civilStartTime": {"date": {"year":{{{today.Year}}},"month":{{{today.Month}}},"day":{{{today.Day}}}}},
+                          "activeZoneMinutes": {
+                            "sumInFatBurnHeartZone": 30,
+                            "sumInCardioHeartZone": 40,
+                            "sumInPeakHeartZone": 40
+                          }
                         }
                       ]
                     }
@@ -246,6 +254,8 @@ public sealed class GoogleHealthSyncServiceTests : IAsyncLifetime
         var stored = await _dbContext.DailyMetricSnapshots
             .SingleAsync(snapshot => snapshot.MetricDate == today);
         Assert.Equal(1.01m, stored.Acwr);
+        Assert.Equal(80.29m, stored.TargetLoadMin);
+        Assert.Equal(120.43m, stored.TargetLoadMax);
         Assert.All(
             await _dbContext.DailyMetricSnapshots.Where(snapshot => snapshot.MetricDate < today).ToListAsync(),
             snapshot => Assert.Null(snapshot.Acwr));

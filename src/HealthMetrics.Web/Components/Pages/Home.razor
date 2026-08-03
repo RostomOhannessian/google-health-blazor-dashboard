@@ -18,7 +18,7 @@
         <button type="button" class="btn @(selectedDays == 90 ? "btn-primary" : "btn-outline-primary")" @onclick="@(() => ChangeRangeAsync(90))">90 d</button>
     </div>
 </div>
-<p class="text-muted mb-3">Daily heart, recovery, cardio load, sleep, fitness, and nutrition metrics synced from the Google Health API and persisted locally.</p>
+<p class="text-muted mb-3">Daily heart, recovery, Active Zone Minutes, sleep, fitness, and nutrition metrics synced from the Google Health API and persisted locally.</p>
 
 <div class="d-flex flex-wrap gap-2 mb-4">
     @if (connectionStatus?.IsConnected != true)
@@ -122,9 +122,9 @@
     <div class="col-sm-6 col-xl-2">
         <div class="card h-100">
             <div class="card-body">
-                <h6 class="card-subtitle text-muted mb-1">Daily Cardio Load</h6>
+                <h6 class="card-subtitle text-muted mb-1">Daily Active Zone Minutes (AZM)</h6>
                 <p class="card-text fw-semibold mb-0">@CardioLoadText(summary)</p>
-                <small class="text-muted">Current day vs. recommended target</small>
+                <small class="text-muted">Current day vs. local reference range</small>
             </div>
         </div>
     </div>
@@ -149,10 +149,10 @@
 {
     <div class="card mb-4">
         <div class="card-header d-flex align-items-center justify-content-between gap-2 flex-wrap">
-            <span class="fw-semibold">@(chartMode == ChartMode.Load ? "Cardio & load strain" : "Heart rate & HRV trend")</span>
+            <span class="fw-semibold">@(chartMode == ChartMode.Load ? "Active Zone Minutes & training strain" : "Heart rate & HRV trend")</span>
             <div class="btn-group btn-group-sm" role="group" aria-label="Chart metric">
                 <button type="button" class="btn @(chartMode == ChartMode.Heart ? "btn-primary" : "btn-outline-primary")" @onclick="@(() => SetChartModeAsync(ChartMode.Heart))" disabled="@(!HasHeartMetrics)">Heart &amp; HRV</button>
-                <button type="button" class="btn @(chartMode == ChartMode.Load ? "btn-primary" : "btn-outline-primary")" @onclick="@(() => SetChartModeAsync(ChartMode.Load))" disabled="@(!HasLoadMetrics)">Cardio &amp; Load Strain</button>
+                <button type="button" class="btn @(chartMode == ChartMode.Load ? "btn-primary" : "btn-outline-primary")" @onclick="@(() => SetChartModeAsync(ChartMode.Load))" disabled="@(!HasLoadMetrics)">AZM &amp; Training Strain</button>
             </div>
         </div>
         <div class="card-body py-2">
@@ -177,8 +177,8 @@
                 <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("hrv"))">HRV (ms) @SortIndicator("hrv")</button></th>
                 <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("dailyVo2"))">Daily VO2 Max @SortIndicator("dailyVo2")</button></th>
                 <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("runVo2"))">Run VO2 Max @SortIndicator("runVo2")</button></th>
-                <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("cardioLoad"))">Cardio Load @SortIndicator("cardioLoad")</button></th>
-                <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("targetLoad"))">Target Load @SortIndicator("targetLoad")</button></th>
+                <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("cardioLoad"))">Active Zone Minutes (AZM) @SortIndicator("cardioLoad")</button></th>
+                <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("targetLoad"))">Local AZM Target @SortIndicator("targetLoad")</button></th>
                 <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("acwr"))">ACWR @SortIndicator("acwr")</button></th>
                 <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("sleepEfficiency"))">Sleep Efficiency (%) @SortIndicator("sleepEfficiency")</button></th>
                 <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("calories"))">Calories @SortIndicator("calories")</button></th>
@@ -457,7 +457,7 @@
         if (metricSummary?.LatestCardioLoad is null)
             return "—";
 
-        return $"{metricSummary.LatestCardioLoad.Value:F1} / Target: {TargetLoadText(metricSummary.LatestTargetLoadMin, metricSummary.LatestTargetLoadMax)}";
+        return $"{metricSummary.LatestCardioLoad.Value:F1} / Local range: {TargetLoadText(metricSummary.LatestTargetLoadMin, metricSummary.LatestTargetLoadMax)}";
     }
 
     private static string TargetLoadText(decimal? min, decimal? max)

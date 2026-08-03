@@ -132,6 +132,7 @@ internal sealed class GoogleHealthSyncService(
                 .Where(item => item.UserKey == LocalUser.Key)
                 .OrderBy(item => item.MetricDate)
                 .ToListAsync(cancellationToken);
+            TargetLoadCalculator.Recalculate(persistedSnapshots);
             AcwrCalculator.Recalculate(persistedSnapshots);
             await dbContext.SaveChangesAsync(cancellationToken);
 
@@ -177,8 +178,6 @@ internal sealed class GoogleHealthSyncService(
         target.DailyVo2MaxMlKgMin = source.DailyVo2MaxMlKgMin ?? target.DailyVo2MaxMlKgMin;
         target.RunVo2MaxMlKgMin = source.RunVo2MaxMlKgMin ?? target.RunVo2MaxMlKgMin;
         target.CardioLoad = source.CardioLoad ?? target.CardioLoad;
-        target.TargetLoadMin = source.TargetLoadMin ?? target.TargetLoadMin;
-        target.TargetLoadMax = source.TargetLoadMax ?? target.TargetLoadMax;
         target.SleepEfficiency = source.SleepEfficiency ?? target.SleepEfficiency;
         target.DeepSleepMinutes = source.DeepSleepMinutes ?? target.DeepSleepMinutes;
         target.RemSleepMinutes = source.RemSleepMinutes ?? target.RemSleepMinutes;
@@ -195,8 +194,6 @@ internal sealed class GoogleHealthSyncService(
         || snapshot.DailyVo2MaxMlKgMin is not null
         || snapshot.RunVo2MaxMlKgMin is not null
         || snapshot.CardioLoad is not null
-        || snapshot.TargetLoadMin is not null
-        || snapshot.TargetLoadMax is not null
         || snapshot.SleepEfficiency is not null
         || snapshot.DeepSleepMinutes is not null
         || snapshot.RemSleepMinutes is not null

@@ -27,8 +27,6 @@ internal sealed class DemoSeedService(HealthMetricsDbContext dbContext) : IDemoS
             // Deterministic seed per calendar date — same run always produces the same values.
             var rng = new Random(date.DayNumber);
             var cardioLoad = Math.Round((decimal)(rng.NextDouble() * 55 + 45), 1);
-            var targetLoadMin = Math.Round((decimal)(rng.NextDouble() * 20 + 45), 1);
-            var targetLoadMax = Math.Round(targetLoadMin + (decimal)(rng.NextDouble() * 25 + 20), 1);
 
             dbContext.DailyMetricSnapshots.Add(new DailyMetricSnapshot
             {
@@ -39,8 +37,6 @@ internal sealed class DemoSeedService(HealthMetricsDbContext dbContext) : IDemoS
                 DailyVo2MaxMlKgMin   = rng.Next(0, 8) == 0 ? null : Math.Round((decimal)(rng.NextDouble() * 14 + 42), 1),
                 RunVo2MaxMlKgMin     = rng.Next(0, 8) == 0 ? null : Math.Round((decimal)(rng.NextDouble() * 14 + 42), 1),
                 CardioLoad           = cardioLoad,
-                TargetLoadMin        = targetLoadMin,
-                TargetLoadMax        = targetLoadMax,
                 SleepEfficiency      = Math.Round((decimal)(rng.NextDouble() * 15 + 82), 2),
                 DeepSleepMinutes     = rng.Next(45, 111),
                 RemSleepMinutes      = rng.Next(70, 151),
@@ -59,6 +55,7 @@ internal sealed class DemoSeedService(HealthMetricsDbContext dbContext) : IDemoS
             .Where(snapshot => snapshot.UserKey == LocalUser.Key)
             .OrderBy(snapshot => snapshot.MetricDate)
             .ToListAsync(cancellationToken);
+        TargetLoadCalculator.Recalculate(snapshots);
         AcwrCalculator.Recalculate(snapshots);
         await dbContext.SaveChangesAsync(cancellationToken);
         return inserted;

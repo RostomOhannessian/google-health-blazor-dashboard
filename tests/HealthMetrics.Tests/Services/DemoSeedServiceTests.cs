@@ -1,4 +1,5 @@
 using HealthMetrics.Application.Interfaces;
+using HealthMetrics.Application.Models;
 using HealthMetrics.Infrastructure.Persistence;
 using HealthMetrics.Infrastructure.Services;
 using Microsoft.Data.Sqlite;
@@ -123,8 +124,6 @@ public sealed class DemoSeedServiceTests : IAsyncLifetime
             Assert.InRange(s.RestingHeartRateBpm!.Value, 52, 67);
             Assert.InRange(s.HrvRmssdMilliseconds!.Value, 30m, 65m);
             Assert.InRange(s.CardioLoad!.Value, 45m, 100m);
-            Assert.InRange(s.TargetLoadMin!.Value, 45m, 65m);
-            Assert.InRange(s.TargetLoadMax!.Value, 65m, 110m);
             Assert.InRange(s.SleepEfficiency!.Value, 82m, 97m);
             Assert.InRange(s.DeepSleepMinutes!.Value, 45, 110);
             Assert.InRange(s.RemSleepMinutes!.Value, 70, 150);
@@ -132,5 +131,18 @@ public sealed class DemoSeedServiceTests : IAsyncLifetime
         }
 
         Assert.Contains(snapshots, snapshot => snapshot.Acwr is not null);
+        Assert.Equal(6, snapshots.Count(snapshot => snapshot.TargetLoadMin is null));
+        Assert.Equal(6, snapshots.Count(snapshot => snapshot.TargetLoadMax is null));
+        Assert.All(
+            snapshots.Where(snapshot => snapshot.TargetLoadMin is not null),
+            snapshot =>
+            {
+                var expected = TargetLoadCalculator.Calculate(
+                    snapshots.ToDictionary(item => item.MetricDate, item => item.CardioLoad),
+                    snapshot.MetricDate);
+                Assert.NotNull(expected);
+                Assert.Equal(expected.Value.Min, snapshot.TargetLoadMin);
+                Assert.Equal(expected.Value.Max, snapshot.TargetLoadMax);
+            });
     }
 }

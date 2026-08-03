@@ -30,7 +30,7 @@ HealthMetrics.Tests
 
 1. `GoogleHealthSyncService` asks `IHealthAuthorizationService` for a valid access token.
 2. `GoogleHealthApiClient` fetches the selected date range by Google data type.
-3. The client maps optional cardio/target-load candidates and selects one sleep
+3. The client maps documented Active Zone Minutes daily rollups and selects one sleep
    session per civil end date, preferring provider-marked main sleep and then
    longest duration.
 4. Before requesting sleep, the service checks the persisted OAuth grant. Older
@@ -40,8 +40,10 @@ HealthMetrics.Tests
 5. The service merges results into `daily_metric_snapshots` using
    `(UserKey, MetricDate)` idempotency and never replaces an existing provider
    value with a null from a partial response.
-6. After the merge is saved, `AcwrCalculator` recalculates the persisted ratios
-   from local history. It clears ratios whose complete 7/28-day windows are no
+6. After the merge is saved, `TargetLoadCalculator` recalculates local AZM
+   reference ranges and `AcwrCalculator` recalculates persisted ratios from
+   local AZM history. The target calculator requires 7 consecutive values and
+   uses up to 28; ACWR clears ratios whose complete 7/28-day windows are no
    longer available.
 7. `sync_history` records requested days, persisted days, duration, outcome, and
    sanitized errors.
@@ -49,11 +51,12 @@ HealthMetrics.Tests
 ## Dashboard and derived metrics
 
 `MetricQueryService` returns local snapshots to the interactive Home component.
-The page derives the latest cardio-load target display and ACWR status badge from
-the persisted fields. The table exposes sortable cardio load, target range, ACWR,
-and sleep-efficiency columns with `—` fallbacks. Chart.js keeps the existing
-Heart & HRV view separate from the Cardio & Load Strain view; the latter uses
-cardio-load bars plus two line datasets whose fill creates the target-load band.
+The page derives the latest local AZM reference display and ACWR status badge
+from the persisted fields. The table exposes sortable AZM, local target range,
+ACWR, and sleep-efficiency columns with `—` fallbacks. Chart.js keeps the
+existing Heart & HRV view separate from the AZM & Training Strain view; the
+latter uses Active Zone Minutes bars plus two line datasets whose fill creates
+the local reference band.
 The CSV endpoint exports the persisted source and derived values, including
 deep/REM minutes, with invariant-culture numeric formatting.
 

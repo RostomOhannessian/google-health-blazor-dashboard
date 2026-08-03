@@ -141,7 +141,7 @@ window.HealthCharts = (function () {
 
             if (hasTargetRange) {
                 datasets.push({
-                    label: "Target Load min",
+                    label: "Local AZM target min",
                     data: targetMinData,
                     type: "line",
                     borderColor: "rgba(25, 135, 84, 0)",
@@ -153,7 +153,7 @@ window.HealthCharts = (function () {
                     yAxisID: "yLoad"
                 });
                 datasets.push({
-                    label: "Target Load range",
+                    label: "Local AZM target range",
                     data: targetMaxData,
                     type: "line",
                     borderColor: "rgba(25, 135, 84, 0.7)",
@@ -168,7 +168,7 @@ window.HealthCharts = (function () {
 
             if (hasCardioLoad) {
                 datasets.push({
-                    label: "Cardio Load",
+                    label: "Active Zone Minutes (AZM)",
                     data: cardioLoadData,
                     type: "bar",
                     backgroundColor: "rgba(13, 110, 253, 0.62)",
@@ -189,7 +189,7 @@ window.HealthCharts = (function () {
                             position: "top",
                             labels: {
                                 color: colors.text,
-                                filter: item => item.text !== "Target Load min"
+                                filter: item => item.text !== "Local AZM target min"
                             }
                         },
                         tooltip: {
@@ -211,7 +211,7 @@ window.HealthCharts = (function () {
                             type: "linear",
                             position: "left",
                             beginAtZero: true,
-                            title: { display: true, text: "Load", color: colors.muted },
+                            title: { display: true, text: "Active Zone Minutes (AZM)", color: colors.muted },
                             ticks: { color: colors.muted },
                             grid: { color: colors.grid },
                             border: { color: colors.grid }

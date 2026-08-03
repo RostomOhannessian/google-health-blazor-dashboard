@@ -87,29 +87,13 @@ internal sealed class GoogleHealthApiClient(
                 "rmssd"),
             cancellationToken);
 
-        await MergeOptionalDailyListAsync(
+        await MergeDailyRollupAsync(
             snapshots,
-            [
-                ("daily-cardio-load", "daily_cardio_load"),
-                ("cardio-load", "cardio_load"),
-                ("training-load", "training_load")
-            ],
+            "active-zone-minutes",
             startDate,
             endDate,
             accessToken,
-            ApplyCardioLoad,
-            cancellationToken);
-
-        await MergeOptionalDailyListAsync(
-            snapshots,
-            [
-                ("daily-target-load", "daily_target_load"),
-                ("target-load", "target_load")
-            ],
-            startDate,
-            endDate,
-            accessToken,
-            ApplyTargetLoad,
+            ApplyActiveZoneMinutes,
             cancellationToken);
 
         if (includeSleep)
@@ -154,55 +138,6 @@ internal sealed class GoogleHealthApiClient(
             stopwatch.ElapsedMilliseconds);
 
         return results;
-    }
-
-    private async Task MergeOptionalDailyListAsync(
-        Dictionary<DateOnly, DailyMetricSnapshot> snapshots,
-        IReadOnlyList<(string DataType, string FilterPrefix)> candidates,
-        DateOnly startDate,
-        DateOnly endDate,
-        string accessToken,
-        Action<DailyMetricSnapshot, JsonElement> apply,
-        CancellationToken cancellationToken)
-    {
-        foreach (var (dataType, filterPrefix) in candidates)
-        {
-            try
-            {
-                await MergeDailyListAsync(
-                    snapshots,
-                    dataType,
-                    filterPrefix,
-                    startDate,
-                    endDate,
-                    accessToken,
-                    apply,
-                    cancellationToken);
-                return;
-            }
-            catch (GoogleHealthApiException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
-            {
-                logger.LogDebug(
-                    "Google Health optional data type is unavailable. DataType: {DataType}; StatusCode: {StatusCode}. Trying the next candidate.",
-                    dataType,
-                    (int?)ex.StatusCode);
-            }
-            catch (GoogleHealthApiException ex) when (ex.StatusCode == HttpStatusCode.BadRequest)
-            {
-                logger.LogWarning(
-                    "Google Health optional data type is unavailable. DataType: {DataType}; StatusCode: {StatusCode}. Trying the next candidate.",
-                    dataType,
-                    (int?)ex.StatusCode);
-            }
-            catch (GoogleHealthApiException ex) when (ex.StatusCode == HttpStatusCode.Forbidden)
-            {
-                logger.LogWarning(
-                    "Google Health optional data type is not authorized. DataType: {DataType}; StatusCode: {StatusCode}. Remaining candidates will be skipped.",
-                    dataType,
-                    (int?)ex.StatusCode);
-                return;
-            }
-        }
     }
 
     private async Task MergeDailyListAsync(
@@ -370,52 +305,19 @@ internal sealed class GoogleHealthApiClient(
             ? candidate.IsMainSleep
             : candidate.DurationMinutes > current.DurationMinutes;
 
-    private static void ApplyCardioLoad(DailyMetricSnapshot snapshot, JsonElement point)
+    private static void ApplyActiveZoneMinutes(DailyMetricSnapshot snapshot, JsonElement point)
     {
-        snapshot.CardioLoad = ReadDecimal(
-            point,
-            "cardioLoad",
-            "cardio_load",
-            "cardioLoadScore",
-            "trainingLoad",
-            "training_load",
-            "load",
-            "score");
-        ApplyTargetLoad(snapshot, point);
-    }
+        var activeZoneMinutes = FindObject(point, "activeZoneMinutes");
+        if (activeZoneMinutes is null)
+            return;
 
-    private static void ApplyTargetLoad(DailyMetricSnapshot snapshot, JsonElement point)
-    {
-        var targetLoad = FindObject(point, "targetLoad", "target_load", "targetLoadRange", "target_load_range");
-        var min = ReadDecimal(
-                point,
-                "targetLoadMin",
-                "target_load_min",
-                "targetMin",
-                "target_min",
-                "recommendedMin",
-                "recommended_min",
-                "lowerBound",
-                "lower_bound",
-                "min",
-                "minimum")
-            ?? (targetLoad is null ? null : ReadDecimal(targetLoad.Value, "min", "minimum", "lowerBound", "lower_bound"));
-        var max = ReadDecimal(
-                point,
-                "targetLoadMax",
-                "target_load_max",
-                "targetMax",
-                "target_max",
-                "recommendedMax",
-                "recommended_max",
-                "upperBound",
-                "upper_bound",
-                "max",
-                "maximum")
-            ?? (targetLoad is null ? null : ReadDecimal(targetLoad.Value, "max", "maximum", "upperBound", "upper_bound"));
+        var fatBurn = ReadDecimal(activeZoneMinutes.Value, "sumInFatBurnHeartZone");
+        var cardio = ReadDecimal(activeZoneMinutes.Value, "sumInCardioHeartZone");
+        var peak = ReadDecimal(activeZoneMinutes.Value, "sumInPeakHeartZone");
+        if (fatBurn is null || cardio is null || peak is null)
+            return;
 
-        snapshot.TargetLoadMin = min ?? snapshot.TargetLoadMin;
-        snapshot.TargetLoadMax = max ?? snapshot.TargetLoadMax;
+        snapshot.CardioLoad = fatBurn.Value + cardio.Value + peak.Value;
     }
 
     private static void ApplyNutrition(DailyMetricSnapshot snapshot, JsonElement point)
@@ -618,8 +520,6 @@ internal sealed class GoogleHealthApiClient(
         || snapshot.DailyVo2MaxMlKgMin is not null
         || snapshot.RunVo2MaxMlKgMin is not null
         || snapshot.CardioLoad is not null
-        || snapshot.TargetLoadMin is not null
-        || snapshot.TargetLoadMax is not null
         || snapshot.SleepEfficiency is not null
         || snapshot.DeepSleepMinutes is not null
         || snapshot.RemSleepMinutes is not null

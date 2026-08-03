@@ -167,10 +167,8 @@
          role="dialog"
          aria-modal="true"
          aria-labelledby="manual-load-modal-heading"
-         aria-describedby="manual-load-help"
-         @onkeydown="HandleManualLoadModalKeyDown"
-         @onclick="CloseManualLoadModal">
-        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg" role="document" @onclick:stopPropagation="true">
+         aria-describedby="manual-load-help">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg" role="document">
             <div class="modal-content">
                 <div class="modal-header">
                     <h2 class="modal-title h5 mb-0" id="manual-load-modal-heading">Manual Cardio Load and Weekly Target Load</h2>
@@ -192,6 +190,20 @@
                                                @bind-Value:after="LoadManualInputsForSelectedDate"
                                                aria-describedby="manual-load-date-help" />
                                     <div class="form-text" id="manual-load-date-help">Choose the day to update.</div>
+                                    <div class="d-flex gap-2 mt-2">
+                                        <button class="btn btn-outline-secondary btn-sm"
+                                                type="button"
+                                                @onclick="@(() => ChangeManualLoadDate(-1))"
+                                                disabled="@isSavingManual">
+                                            Previous day
+                                        </button>
+                                        <button class="btn btn-outline-secondary btn-sm"
+                                                type="button"
+                                                @onclick="@(() => ChangeManualLoadDate(1))"
+                                                disabled="@isSavingManual">
+                                            Next day
+                                        </button>
+                                    </div>
                                 </div>
                                 <div class="col-12 col-md-4">
                                     <label class="form-label" for="manual-cardio-load">Cardio Load (load points)</label>
@@ -258,6 +270,11 @@
                             @manualEntryMessage
                         </div>
                     }
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-outline-secondary" type="button" @onclick="CloseManualLoadModal" disabled="@isSavingManual">
+                        Close
+                    </button>
                 </div>
             </div>
         </div>
@@ -554,12 +571,6 @@
         isConfirmingManualClear = false;
     }
 
-    private void HandleManualLoadModalKeyDown(KeyboardEventArgs args)
-    {
-        if (args.Key == "Escape")
-            CloseManualLoadModal();
-    }
-
     private async Task LoadDataAsync()
     {
         try
@@ -633,6 +644,12 @@
     }
 
     private void LoadManualInputsForSelectedDate() => ResetManualLoadInputs();
+
+    private void ChangeManualLoadDate(int dayOffset)
+    {
+        manualLoadForm.MetricDate = manualLoadForm.MetricDate.AddDays(dayOffset);
+        LoadManualInputsForSelectedDate();
+    }
 
     private void ResetManualLoadInputs()
     {

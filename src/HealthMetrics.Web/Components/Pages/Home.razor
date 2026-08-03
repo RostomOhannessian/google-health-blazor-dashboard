@@ -1,6 +1,8 @@
 @page "/"
 @rendermode InteractiveServer
 @implements IAsyncDisposable
+@using System.Globalization
+@using Microsoft.AspNetCore.Components.Web
 @inject IHealthAuthorizationService OAuthService
 @inject IHealthSyncService SyncService
 @inject IMetricQueryService MetricQueryService
@@ -136,6 +138,7 @@
                         type="button"
                         aria-haspopup="dialog"
                         aria-controls="manual-load-modal"
+                        title="Valid changes save automatically while typing and when leaving a field."
                         @onclick="OpenManualLoadModal">
                     Enter or edit manual load
                 </button>
@@ -179,7 +182,7 @@
                         Record proprietary manual Cardio Load and a weekly Target Load. Weeks run Monday through Sunday, and the values drive the Manual Cardio ACWR calculation only.
                     </p>
                     <EditForm Model="manualLoadForm" OnSubmit="SaveManualLoadAsync" FormName="manual-load-entry-form">
-                        <fieldset aria-describedby="manual-load-help">
+                        <fieldset aria-describedby="manual-load-help manual-load-autosave-help">
                             <legend class="visually-hidden">Manual load entry</legend>
                             <div class="row g-3">
                                 <div class="col-12 col-md-4">
@@ -207,38 +210,52 @@
                                 </div>
                                 <div class="col-12 col-md-4">
                                     <label class="form-label" for="manual-cardio-load">Cardio Load (load points)</label>
-                                    <InputNumber id="manual-cardio-load"
-                                                 class="form-control"
-                                                 @bind-Value="manualLoadForm.CardioLoad"
-                                                 min="0"
-                                                 step="0.1"
-                                                 inputmode="decimal"
-                                                 aria-describedby="manual-cardio-load-help" />
+                                    <input id="manual-cardio-load"
+                                           class="form-control"
+                                           type="text"
+                                           @bind="manualCardioLoadText"
+                                           @bind:event="oninput"
+                                           @onkeydown="QueueManualLoadAutoSaveAsync"
+                                           @onblur="AutoSaveManualLoadOnBlurAsync"
+                                           inputmode="decimal"
+                                           autocomplete="off"
+                                           aria-describedby="manual-cardio-load-help" />
                                     <div class="form-text" id="manual-cardio-load-help">Optional proprietary daily load.</div>
                                 </div>
                                 <div class="col-12 col-md-4">
                                     <label class="form-label" for="manual-target">Weekly Target (load points)</label>
-                                    <InputNumber id="manual-target"
-                                                 class="form-control"
-                                                 @bind-Value="manualLoadForm.TargetLoad"
-                                                 min="0"
-                                                 step="0.1"
-                                                 inputmode="decimal"
-                                                 aria-describedby="manual-target-help" />
+                                    <input id="manual-target"
+                                           class="form-control"
+                                           type="text"
+                                           @bind="manualTargetLoadText"
+                                           @bind:event="oninput"
+                                           @onkeydown="QueueManualLoadAutoSaveAsync"
+                                           @onblur="AutoSaveManualLoadOnBlurAsync"
+                                           inputmode="decimal"
+                                           autocomplete="off"
+                                           aria-describedby="manual-target-help" />
                                     <div class="form-text" id="manual-target-help">Optional Monday–Sunday target amount.</div>
                                 </div>
                             </div>
-                            <p class="form-text mb-3">
-                                All load fields are optional. Leave a value blank and save to clear that existing manual value.
+                            <p class="form-text mb-3" id="manual-load-autosave-help">
+                                All load fields are optional. Valid changes save automatically while typing and when leaving a field. Values must be zero or greater; leave a field blank to clear it.
                             </p>
                             <div class="d-flex flex-wrap gap-2">
                                 <button class="btn btn-primary" type="submit" disabled="@isSavingManual">
                                     @(isSavingManual ? "Saving…" : "Save manual load")
                                 </button>
-                                <button class="btn btn-outline-secondary" type="button" @onclick="ResetManualLoadInputs" disabled="@isSavingManual">
+                                <button class="btn btn-outline-secondary"
+                                        type="button"
+                                        @onmousedown="SuppressNextManualLoadAutoSave"
+                                        @onclick="ResetManualLoadInputs"
+                                        disabled="@isSavingManual">
                                     Reset unsaved changes
                                 </button>
-                                <button class="btn btn-outline-danger" type="button" @onclick="BeginManualLoadClear" disabled="@isSavingManual">
+                                <button class="btn btn-outline-danger"
+                                        type="button"
+                                        @onmousedown="SuppressNextManualLoadAutoSave"
+                                        @onclick="BeginManualLoadClear"
+                                        disabled="@isSavingManual">
                                     Clear saved values
                                 </button>
                             </div>
@@ -432,6 +449,10 @@
     private string? seedMessage;
     private string? manualEntryMessage;
     private readonly ManualLoadForm manualLoadForm = new(DateOnly.FromDateTime(DateTime.UtcNow));
+    private string manualCardioLoadText = string.Empty;
+    private string manualTargetLoadText = string.Empty;
+    private CancellationTokenSource? manualAutoSaveCts;
+    private bool suppressNextManualAutoSave;
     private bool isConfirmingManualClear;
     private bool isManualLoadModalOpen;
     private MetricRange selectedRange = MetricRange.ThirtyDays;
@@ -484,6 +505,7 @@
 
     public async ValueTask DisposeAsync()
     {
+        CancelPendingManualAutoSave();
         await _cts.CancelAsync();
         _cts.Dispose();
     }
@@ -562,6 +584,8 @@
 
     private void OpenManualLoadModal()
     {
+        CancelPendingManualAutoSave();
+        suppressNextManualAutoSave = false;
         isManualLoadModalOpen = true;
         isConfirmingManualClear = false;
         manualEntryError = false;
@@ -580,6 +604,8 @@
         if (isSavingManual)
             return;
 
+        CancelPendingManualAutoSave();
+        suppressNextManualAutoSave = false;
         isManualLoadModalOpen = false;
         isConfirmingManualClear = false;
     }
@@ -622,8 +648,13 @@
         await LoadDataAsync();
     }
 
-    private async Task SaveManualLoadAsync()
+    private Task SaveManualLoadAsync() => PersistManualLoadAsync(isAutoSave: false);
+
+    private async Task PersistManualLoadAsync(bool isAutoSave, bool inputsAlreadyParsed = false)
     {
+        if (!inputsAlreadyParsed && !TryApplyManualLoadInputs())
+            return;
+
         try
         {
             isSavingManual = true;
@@ -636,7 +667,9 @@
                 _cts.Token);
             manualEntryError = !result.Succeeded;
             manualEntryMessage = result.Succeeded
-                ? "Manual Cardio Load and weekly Target Load saved."
+                ? isAutoSave
+                    ? "Manual Cardio Load and weekly Target Load autosaved."
+                    : "Manual Cardio Load and weekly Target Load saved."
                 : result.ErrorMessage;
             if (result.Succeeded)
             {
@@ -656,16 +689,163 @@
         }
     }
 
+    private async Task QueueManualLoadAutoSaveAsync(KeyboardEventArgs args)
+    {
+        if (!isManualLoadModalOpen || !IsManualLoadEditKey(args))
+            return;
+
+        CancelPendingManualAutoSave();
+        var cancellationSource = new CancellationTokenSource();
+        var cancellationToken = cancellationSource.Token;
+        manualAutoSaveCts = cancellationSource;
+        try
+        {
+            await Task.Delay(250, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            await AutoSaveManualLoadAsync();
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            if (ReferenceEquals(manualAutoSaveCts, cancellationSource))
+            {
+                manualAutoSaveCts = null;
+                cancellationSource.Dispose();
+            }
+        }
+    }
+
+    private async Task AutoSaveManualLoadOnBlurAsync(FocusEventArgs _)
+    {
+        if (suppressNextManualAutoSave)
+        {
+            suppressNextManualAutoSave = false;
+            return;
+        }
+
+        CancelPendingManualAutoSave();
+        await AutoSaveManualLoadAsync();
+    }
+
+    private async Task AutoSaveManualLoadAsync()
+    {
+        if (!isManualLoadModalOpen || isSavingManual || !TryApplyManualLoadInputs())
+            return;
+
+        if (!HasManualLoadChanges())
+            return;
+
+        await PersistManualLoadAsync(isAutoSave: true, inputsAlreadyParsed: true);
+    }
+
+    private void CancelPendingManualAutoSave()
+    {
+        var cancellationSource = manualAutoSaveCts;
+        manualAutoSaveCts = null;
+        if (cancellationSource is null)
+            return;
+
+        cancellationSource.Cancel();
+        cancellationSource.Dispose();
+    }
+
+    private void SuppressNextManualLoadAutoSave(MouseEventArgs _)
+    {
+        suppressNextManualAutoSave = true;
+        CancelPendingManualAutoSave();
+    }
+
+    private static bool IsManualLoadEditKey(KeyboardEventArgs args) =>
+        !args.CtrlKey
+        && !args.AltKey
+        && !args.MetaKey
+        && (args.Key?.Length == 1
+            || args.Key is "Backspace" or "Delete" or "ArrowDown" or "ArrowUp" or "Enter");
+
+    private bool TryApplyManualLoadInputs()
+    {
+        if (!TryParseOptionalManualLoad(
+                manualCardioLoadText,
+                "Manual Cardio Load",
+                out var cardioLoad,
+                out var validationError)
+            || !TryParseOptionalManualLoad(
+                manualTargetLoadText,
+                "Weekly target",
+                out var targetLoad,
+                out validationError))
+        {
+            manualEntryError = true;
+            manualEntryMessage = validationError;
+            return false;
+        }
+
+        manualLoadForm.CardioLoad = cardioLoad;
+        manualLoadForm.TargetLoad = targetLoad;
+        manualEntryError = false;
+        manualEntryMessage = null;
+        return true;
+    }
+
+    private static bool TryParseOptionalManualLoad(
+        string text,
+        string fieldName,
+        out decimal? value,
+        out string? validationError)
+    {
+        value = null;
+        validationError = null;
+        if (string.IsNullOrWhiteSpace(text))
+            return true;
+
+        if (!decimal.TryParse(text, NumberStyles.Number, CultureInfo.CurrentCulture, out var parsed))
+        {
+            validationError = $"{fieldName} must be a valid number.";
+            return false;
+        }
+
+        if (parsed < 0)
+        {
+            validationError = $"{fieldName} cannot be negative.";
+            return false;
+        }
+
+        value = parsed;
+        return true;
+    }
+
+    private bool HasManualLoadChanges()
+    {
+        var snapshot = loadHistory.SingleOrDefault(metric => metric.MetricDate == manualLoadForm.MetricDate);
+        var weekStart = WeeklyLoadCalculator.GetWeekStart(manualLoadForm.MetricDate);
+        var savedTarget = loadHistory
+            .Where(metric => WeeklyLoadCalculator.GetWeekStart(metric.MetricDate) == weekStart)
+            .OrderByDescending(metric => metric.MetricDate)
+            .Select(metric => metric.TargetLoad)
+            .FirstOrDefault(target => target.HasValue);
+
+        return manualLoadForm.CardioLoad != snapshot?.CardioLoad
+            || manualLoadForm.TargetLoad != savedTarget;
+    }
+
+    private static string FormatManualLoad(decimal? value) =>
+        value?.ToString("G29", CultureInfo.CurrentCulture) ?? string.Empty;
+
     private void LoadManualInputsForSelectedDate() => ResetManualLoadInputs();
 
     private void ChangeManualLoadDate(int dayOffset)
     {
+        CancelPendingManualAutoSave();
         manualLoadForm.MetricDate = manualLoadForm.MetricDate.AddDays(dayOffset);
         LoadManualInputsForSelectedDate();
     }
 
     private void ResetManualLoadInputs()
     {
+        CancelPendingManualAutoSave();
+        suppressNextManualAutoSave = false;
         var snapshot = loadHistory.SingleOrDefault(metric => metric.MetricDate == manualLoadForm.MetricDate);
         var weekStart = WeeklyLoadCalculator.GetWeekStart(manualLoadForm.MetricDate);
         manualLoadForm.CardioLoad = snapshot?.CardioLoad;
@@ -674,6 +854,8 @@
             .OrderByDescending(metric => metric.MetricDate)
             .Select(metric => metric.TargetLoad)
             .FirstOrDefault(target => target.HasValue);
+        manualCardioLoadText = FormatManualLoad(manualLoadForm.CardioLoad);
+        manualTargetLoadText = FormatManualLoad(manualLoadForm.TargetLoad);
         isConfirmingManualClear = false;
         manualEntryError = false;
         manualEntryMessage = "Unsaved changes were reset to the saved values for this date.";
@@ -681,6 +863,7 @@
 
     private void BeginManualLoadClear()
     {
+        suppressNextManualAutoSave = false;
         isConfirmingManualClear = true;
         manualEntryMessage = null;
     }
@@ -689,9 +872,11 @@
 
     private async Task ClearManualLoadAsync()
     {
+        manualCardioLoadText = string.Empty;
+        manualTargetLoadText = string.Empty;
         manualLoadForm.CardioLoad = null;
         manualLoadForm.TargetLoad = null;
-        await SaveManualLoadAsync();
+        await PersistManualLoadAsync(isAutoSave: false, inputsAlreadyParsed: true);
     }
 
     private async Task DisconnectAsync()

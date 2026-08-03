@@ -5,6 +5,8 @@ namespace HealthMetrics.Infrastructure.Persistence;
 
 public sealed class HealthMetricsDbContext(DbContextOptions<HealthMetricsDbContext> options) : DbContext(options)
 {
+    public DbSet<UserDataOwnership> UserDataOwnerships => Set<UserDataOwnership>();
+
     public DbSet<HealthConnection> HealthConnections => Set<HealthConnection>();
 
     public DbSet<DailyMetricSnapshot> DailyMetricSnapshots => Set<DailyMetricSnapshot>();
@@ -24,6 +26,16 @@ public sealed class HealthMetricsDbContext(DbContextOptions<HealthMetricsDbConte
             entity.Property(connection => connection.AccessToken).HasMaxLength(4000).IsRequired();
             entity.Property(connection => connection.RefreshToken).HasMaxLength(4000).IsRequired();
             entity.Property(connection => connection.Scope).HasMaxLength(1200).IsRequired();
+        });
+
+        modelBuilder.Entity<UserDataOwnership>(entity =>
+        {
+            entity.ToTable("user_data_ownership");
+            entity.HasKey(ownership => ownership.Id);
+            entity.HasIndex(ownership => ownership.UserKey).IsUnique();
+            entity.Property(ownership => ownership.UserKey).HasMaxLength(120).IsRequired();
+            entity.Property(ownership => ownership.GoogleUserId).HasMaxLength(160).IsRequired();
+            entity.Property(ownership => ownership.GoogleEmail).HasMaxLength(320);
         });
 
         modelBuilder.Entity<DailyMetricSnapshot>(entity =>

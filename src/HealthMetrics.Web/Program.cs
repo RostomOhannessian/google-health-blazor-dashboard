@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
+using HealthMetrics.Application.Exceptions;
 using HealthMetrics.Application.Interfaces;
 using HealthMetrics.Infrastructure.DependencyInjection;
 using HealthMetrics.Infrastructure.Persistence;
@@ -150,7 +151,18 @@ try
             }
 
             memoryCache.Remove(GetStateCacheKey(state));
-            await authService.HandleAuthorizationCodeAsync(code, cancellationToken);
+            try
+            {
+                await authService.HandleAuthorizationCodeAsync(code, cancellationToken);
+            }
+            catch (GoogleAccountSwitchRequiresResetException ex)
+            {
+                endpointLogger.LogWarning(
+                    ex,
+                    "Google Health callback rejected because the connection would switch accounts without clearing local history.");
+                return Results.Redirect("/?authError=account_switch_blocked");
+            }
+
             endpointLogger.LogInformation("Google Health callback completed successfully.");
             return Results.Redirect("/");
         });

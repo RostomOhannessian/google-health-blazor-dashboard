@@ -180,6 +180,40 @@ public sealed class HealthMetricsDbContextTests
         Assert.Equal(0, await ScalarAsync<long>(connection, "SELECT COUNT(*) FROM pragma_table_info('daily_metric_snapshots') WHERE name = 'ActiveZoneMinutesAcwr'"));
     }
 
+    [Fact]
+    public async Task AddUserDataOwnershipMigration_BackfillsCurrentConnectionOwner()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<HealthMetricsDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using (var legacyContext = new HealthMetricsDbContext(options))
+        {
+            var migrator = legacyContext.GetService<IMigrator>();
+            await migrator.MigrateAsync("20260803184531_RemoveAzmAndSimplifyManualTarget");
+            await legacyContext.Database.ExecuteSqlRawAsync("""
+                INSERT INTO health_connections (
+                    UserKey, GoogleUserId, GoogleEmail, AccessToken, RefreshToken, Scope,
+                    AccessTokenExpiresAtUtc, CreatedAtUtc, UpdatedAtUtc
+                ) VALUES (
+                    'local-user', 'legacy-google-user', 'legacy@example.com', 'at', 'rt', 'openid email',
+                    '2026-08-03T00:00:00+00:00', '2026-08-02T00:00:00+00:00', '2026-08-02T00:00:00+00:00'
+                );
+                """);
+            await migrator.MigrateAsync();
+        }
+
+        Assert.Equal(1, await ScalarAsync<long>(connection, "SELECT COUNT(*) FROM user_data_ownership"));
+        Assert.Equal(
+            "legacy-google-user",
+            await ScalarAsync<string>(connection, "SELECT GoogleUserId FROM user_data_ownership LIMIT 1"));
+        Assert.Equal(
+            "legacy@example.com",
+            await ScalarAsync<string>(connection, "SELECT GoogleEmail FROM user_data_ownership LIMIT 1"));
+    }
+
     private static string LegacyConnectionTable => "fit" + "bit_connections";
 
     private static string LegacyUserIdColumn => "Fit" + "bitUserId";

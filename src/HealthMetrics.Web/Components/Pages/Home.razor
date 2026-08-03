@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @implements IAsyncDisposable
 @using System.Globalization
+@using Microsoft.AspNetCore.Components
 @using Microsoft.AspNetCore.Components.Web
 @inject IHealthAuthorizationService OAuthService
 @inject IHealthSyncService SyncService
@@ -446,6 +447,9 @@
 }
 
 @code {
+    [SupplyParameterFromQuery(Name = "authError")]
+    public string? AuthError { get; set; }
+
     private readonly CancellationTokenSource _cts = new();
     private readonly List<DailyMetricSnapshot> metrics = [];
     private readonly List<DailyMetricSnapshot> loadHistory = [];
@@ -473,6 +477,17 @@
     private ChartMode chartMode = ChartMode.Heart;
     private string sortColumn = "date";
     private bool sortDescending = true;
+
+    protected override void OnParametersSet()
+    {
+        lastError = AuthError switch
+        {
+            "missing_code" => "Google Health did not return an authorization code.",
+            "invalid_state" => "Google Health sign-in could not be verified. Try connecting again.",
+            "account_switch_blocked" => "This dashboard already contains local history for a different Google account. Clear health-metrics.db before connecting another account.",
+            _ => null
+        };
+    }
 
     private bool HasHeartMetrics =>
         metrics.Any(m => m.RestingHeartRateBpm.HasValue || m.HrvRmssdMilliseconds.HasValue);
@@ -631,7 +646,7 @@
     {
         try
         {
-            lastError = null;
+            var authError = lastError;
             var dayCount = SelectedDayCount;
             connectionStatus = await OAuthService.GetConnectionStatusAsync(_cts.Token);
             var loaded = await MetricQueryService.GetRecentMetricsAsync(dayCount, _cts.Token);
@@ -651,6 +666,7 @@
             syncHistory.Clear();
             syncHistory.AddRange(history);
             chartNeedsRender = true;
+            lastError = authError;
         }
         catch (Exception ex)
         {

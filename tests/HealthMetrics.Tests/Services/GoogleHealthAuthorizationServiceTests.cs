@@ -1,5 +1,6 @@
 using System.Net;
 using Google.Apis.Auth.OAuth2.Responses;
+using HealthMetrics.Application.Exceptions;
 using HealthMetrics.Application.Models;
 using HealthMetrics.Infrastructure.Clients;
 using HealthMetrics.Infrastructure.Options;
@@ -171,6 +172,9 @@ public sealed class GoogleHealthAuthorizationServiceTests : IAsyncLifetime
         Assert.Equal("gid-1", conn.GoogleUserId);
         Assert.Equal("a@b.com", conn.GoogleEmail);
         Assert.Equal("openid email", conn.Scope);
+        var ownership = await _dbContext.UserDataOwnerships.SingleAsync();
+        Assert.Equal("gid-1", ownership.GoogleUserId);
+        Assert.Equal("a@b.com", ownership.GoogleEmail);
     }
 
     [Fact]
@@ -201,6 +205,56 @@ public sealed class GoogleHealthAuthorizationServiceTests : IAsyncLifetime
         Assert.Equal(1, await _dbContext.HealthConnections.CountAsync());
         var conn = await _dbContext.HealthConnections.SingleAsync();
         Assert.Equal("new-user", conn.GoogleUserId);
+    }
+
+    [Fact]
+    public async Task HandleAuthorizationCodeAsync_WhenSwitchingAccountsWithPersistedHistory_ThrowsAndPreservesExistingConnection()
+    {
+        var protector = _dp.CreateProtector("HealthMetrics.GoogleTokens.v1");
+        _dbContext.HealthConnections.Add(new HealthConnection
+        {
+            GoogleUserId = "old-user",
+            GoogleEmail = "old@example.com",
+            AccessToken = protector.Protect("old-at"),
+            RefreshToken = protector.Protect("old-rt"),
+            Scope = "openid email",
+            AccessTokenExpiresAtUtc = DateTimeOffset.UtcNow.AddHours(1)
+        });
+        _dbContext.UserDataOwnerships.Add(new UserDataOwnership
+        {
+            GoogleUserId = "old-user",
+            GoogleEmail = "old@example.com"
+        });
+        _dbContext.DailyMetricSnapshots.Add(new DailyMetricSnapshot
+        {
+            MetricDate = new DateOnly(2026, 8, 2),
+            RestingHeartRateBpm = 58
+        });
+        await _dbContext.SaveChangesAsync();
+
+        var fakeAdapter = new FakeGoogleAuthAdapter(
+            exchangeResponse: new TokenResponse
+            {
+                AccessToken = "new-at",
+                RefreshToken = "new-rt",
+                ExpiresInSeconds = 3600,
+                Scope = "openid email"
+            });
+
+        var exception = await Assert.ThrowsAsync<GoogleAccountSwitchRequiresResetException>(() =>
+            CreateService(fakeAdapter, googleUserId: "new-user", googleEmail: "new@example.com")
+                .HandleAuthorizationCodeAsync("code"));
+
+        Assert.Contains("old@example.com", exception.Message);
+        Assert.Contains("new@example.com", exception.Message);
+
+        var connection = await _dbContext.HealthConnections.SingleAsync();
+        Assert.Equal("old-user", connection.GoogleUserId);
+        Assert.Equal("old@example.com", connection.GoogleEmail);
+
+        var ownership = await _dbContext.UserDataOwnerships.SingleAsync();
+        Assert.Equal("old-user", ownership.GoogleUserId);
+        Assert.Equal("old@example.com", ownership.GoogleEmail);
     }
 
     [Fact]

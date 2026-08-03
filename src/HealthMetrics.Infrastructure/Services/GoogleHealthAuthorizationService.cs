@@ -1,4 +1,5 @@
 using Google.Apis.Auth.OAuth2.Responses;
+using HealthMetrics.Application.Exceptions;
 using HealthMetrics.Application.Interfaces;
 using HealthMetrics.Application.Models;
 using HealthMetrics.Infrastructure.Clients;
@@ -53,7 +54,11 @@ internal sealed class GoogleHealthAuthorizationService(
         var googleEmail = await googleAccountApiClient.GetEmailAsync(token.AccessToken, cancellationToken);
         var connection = await dbContext.HealthConnections
             .SingleOrDefaultAsync(item => item.UserKey == LocalUser.Key, cancellationToken);
+        var ownership = await dbContext.UserDataOwnerships
+            .SingleOrDefaultAsync(item => item.UserKey == LocalUser.Key, cancellationToken);
         var isNewConnection = connection is null;
+
+        await EnforceAccountBoundaryAsync(ownership, connection, googleUserId, googleEmail, cancellationToken);
 
         var normalizedScope = NormalizeScope(token.Scope, connection?.Scope, _configuredScopes);
         var scopeCount = normalizedScope
@@ -87,6 +92,23 @@ internal sealed class GoogleHealthAuthorizationService(
             connection.AccessTokenExpiresAtUtc = CalculateExpiry(token);
             connection.RefreshTokenExpiresAtUtc = CalculateRefreshTokenExpiry(token);
             connection.UpdatedAtUtc = DateTimeOffset.UtcNow;
+        }
+
+        if (ownership is null)
+        {
+            dbContext.UserDataOwnerships.Add(new UserDataOwnership
+            {
+                UserKey = LocalUser.Key,
+                GoogleUserId = googleUserId,
+                GoogleEmail = googleEmail,
+                UpdatedAtUtc = DateTimeOffset.UtcNow
+            });
+        }
+        else
+        {
+            ownership.GoogleUserId = googleUserId;
+            ownership.GoogleEmail = googleEmail;
+            ownership.UpdatedAtUtc = DateTimeOffset.UtcNow;
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -246,4 +268,43 @@ internal sealed class GoogleHealthAuthorizationService(
 
         return string.Empty;
     }
+
+    private async Task EnforceAccountBoundaryAsync(
+        UserDataOwnership? ownership,
+        HealthConnection? connection,
+        string googleUserId,
+        string? googleEmail,
+        CancellationToken cancellationToken)
+    {
+        var existingOwnerId = ownership?.GoogleUserId ?? connection?.GoogleUserId;
+        if (string.IsNullOrWhiteSpace(existingOwnerId)
+            || string.Equals(existingOwnerId, googleUserId, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        var hasPersistedHistory = await dbContext.DailyMetricSnapshots
+            .AnyAsync(item => item.UserKey == LocalUser.Key, cancellationToken);
+        if (!hasPersistedHistory)
+        {
+            hasPersistedHistory = await dbContext.SyncHistory
+                .AnyAsync(item => item.UserKey == LocalUser.Key, cancellationToken);
+        }
+
+        if (!hasPersistedHistory)
+            return;
+
+        var existingAccount = FormatAccountLabel(ownership?.GoogleEmail, existingOwnerId);
+        var requestedAccount = FormatAccountLabel(googleEmail, googleUserId);
+        logger.LogWarning(
+            "Blocked Google Health account switch from {ExistingAccount} to {RequestedAccount} because local history already exists.",
+            existingAccount,
+            requestedAccount);
+        throw new GoogleAccountSwitchRequiresResetException(existingAccount, requestedAccount);
+    }
+
+    private static string FormatAccountLabel(string? googleEmail, string googleUserId) =>
+        string.IsNullOrWhiteSpace(googleEmail)
+            ? $"Google user {googleUserId}"
+            : $"Google account {googleEmail}";
 }

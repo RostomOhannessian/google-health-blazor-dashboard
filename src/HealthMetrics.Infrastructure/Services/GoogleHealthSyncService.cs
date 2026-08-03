@@ -15,22 +15,14 @@ internal sealed class GoogleHealthSyncService(
     GoogleHealthApiClient googleHealthApiClient,
     ILogger<GoogleHealthSyncService> logger) : IHealthSyncService
 {
-    private static readonly SemaphoreSlim SyncLock = new(1, 1);
-
     public async Task<SyncResult> SyncRecentDaysAsync(int dayCount, CancellationToken cancellationToken = default)
     {
         if (dayCount <= 0 || dayCount > 366)
             throw new ArgumentOutOfRangeException(nameof(dayCount), "Day count must be between 1 and 366.");
 
-        await SyncLock.WaitAsync(cancellationToken);
-        try
-        {
-        return await RunSyncCoreAsync(dayCount, cancellationToken);
-        }
-        finally
-        {
-            SyncLock.Release();
-        }
+        return await SnapshotMutationCoordinator.RunAsync(
+            () => RunSyncCoreAsync(dayCount, cancellationToken),
+            cancellationToken);
     }
 
     private async Task<SyncResult> RunSyncCoreAsync(int dayCount, CancellationToken cancellationToken)

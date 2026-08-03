@@ -113,6 +113,14 @@ internal sealed class GoogleHealthSyncService(
             historyEntry.Outcome = daysWithMetricValues > 0 ? SyncOutcome.Success : SyncOutcome.PartialSuccess;
 
             await dbContext.SaveChangesAsync(cancellationToken);
+
+            var persistedSnapshots = await dbContext.DailyMetricSnapshots
+                .Where(item => item.UserKey == LocalUser.Key)
+                .OrderBy(item => item.MetricDate)
+                .ToListAsync(cancellationToken);
+            AcwrCalculator.Recalculate(persistedSnapshots);
+            await dbContext.SaveChangesAsync(cancellationToken);
+
             stopwatch.Stop();
 
             logger.LogInformation(
@@ -154,6 +162,12 @@ internal sealed class GoogleHealthSyncService(
         target.HrvRmssdMilliseconds = source.HrvRmssdMilliseconds ?? target.HrvRmssdMilliseconds;
         target.DailyVo2MaxMlKgMin = source.DailyVo2MaxMlKgMin ?? target.DailyVo2MaxMlKgMin;
         target.RunVo2MaxMlKgMin = source.RunVo2MaxMlKgMin ?? target.RunVo2MaxMlKgMin;
+        target.CardioLoad = source.CardioLoad ?? target.CardioLoad;
+        target.TargetLoadMin = source.TargetLoadMin ?? target.TargetLoadMin;
+        target.TargetLoadMax = source.TargetLoadMax ?? target.TargetLoadMax;
+        target.SleepEfficiency = source.SleepEfficiency ?? target.SleepEfficiency;
+        target.DeepSleepMinutes = source.DeepSleepMinutes ?? target.DeepSleepMinutes;
+        target.RemSleepMinutes = source.RemSleepMinutes ?? target.RemSleepMinutes;
         target.ConsumedCaloriesKcal = source.ConsumedCaloriesKcal ?? target.ConsumedCaloriesKcal;
         target.CarbohydratesGrams = source.CarbohydratesGrams ?? target.CarbohydratesGrams;
         target.FatGrams = source.FatGrams ?? target.FatGrams;
@@ -166,6 +180,12 @@ internal sealed class GoogleHealthSyncService(
         || snapshot.HrvRmssdMilliseconds is not null
         || snapshot.DailyVo2MaxMlKgMin is not null
         || snapshot.RunVo2MaxMlKgMin is not null
+        || snapshot.CardioLoad is not null
+        || snapshot.TargetLoadMin is not null
+        || snapshot.TargetLoadMax is not null
+        || snapshot.SleepEfficiency is not null
+        || snapshot.DeepSleepMinutes is not null
+        || snapshot.RemSleepMinutes is not null
         || snapshot.ConsumedCaloriesKcal is not null
         || snapshot.CarbohydratesGrams is not null
         || snapshot.FatGrams is not null

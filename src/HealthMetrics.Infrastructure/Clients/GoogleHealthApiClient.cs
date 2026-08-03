@@ -86,6 +86,33 @@ internal sealed class GoogleHealthApiClient(
                 "rmssd"),
             cancellationToken);
 
+        await MergeOptionalDailyListAsync(
+            snapshots,
+            [
+                ("daily-cardio-load", "daily_cardio_load"),
+                ("cardio-load", "cardio_load"),
+                ("training-load", "training_load")
+            ],
+            startDate,
+            endDate,
+            accessToken,
+            ApplyCardioLoad,
+            cancellationToken);
+
+        await MergeOptionalDailyListAsync(
+            snapshots,
+            [
+                ("daily-target-load", "daily_target_load"),
+                ("target-load", "target_load")
+            ],
+            startDate,
+            endDate,
+            accessToken,
+            ApplyTargetLoad,
+            cancellationToken);
+
+        await MergeSleepAsync(snapshots, startDate, endDate, accessToken, cancellationToken);
+
         await MergeDailyListAsync(
             snapshots,
             "daily-vo2-max",
@@ -125,6 +152,39 @@ internal sealed class GoogleHealthApiClient(
             stopwatch.ElapsedMilliseconds);
 
         return results;
+    }
+
+    private async Task MergeOptionalDailyListAsync(
+        Dictionary<DateOnly, DailyMetricSnapshot> snapshots,
+        IReadOnlyList<(string DataType, string FilterPrefix)> candidates,
+        DateOnly startDate,
+        DateOnly endDate,
+        string accessToken,
+        Action<DailyMetricSnapshot, JsonElement> apply,
+        CancellationToken cancellationToken)
+    {
+        foreach (var (dataType, filterPrefix) in candidates)
+        {
+            try
+            {
+                await MergeDailyListAsync(
+                    snapshots,
+                    dataType,
+                    filterPrefix,
+                    startDate,
+                    endDate,
+                    accessToken,
+                    apply,
+                    cancellationToken);
+                return;
+            }
+            catch (GoogleHealthApiException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+            {
+                logger.LogDebug(
+                    "Google Health optional data type is unavailable. DataType: {DataType}.",
+                    dataType);
+            }
+        }
     }
 
     private async Task MergeDailyListAsync(
@@ -234,6 +294,110 @@ internal sealed class GoogleHealthApiClient(
             dataType,
             chunkCount,
             pointCount);
+    }
+
+    private async Task MergeSleepAsync(
+        Dictionary<DateOnly, DailyMetricSnapshot> snapshots,
+        DateOnly startDate,
+        DateOnly endDate,
+        string accessToken,
+        CancellationToken cancellationToken)
+    {
+        var exclusiveEndDate = endDate.AddDays(1);
+        var filter = $"sleep.interval.civil_end_time >= \"{startDate:yyyy-MM-dd}\" AND sleep.interval.civil_end_time < \"{exclusiveEndDate:yyyy-MM-dd}\"";
+        var pageToken = string.Empty;
+        var candidates = new Dictionary<DateOnly, SleepMetrics>();
+
+        do
+        {
+            var path = new StringBuilder(
+                $"users/me/dataTypes/sleep/dataPoints?pageSize=25&filter={Uri.EscapeDataString(filter)}");
+            if (!string.IsNullOrWhiteSpace(pageToken))
+                path.Append("&pageToken=").Append(Uri.EscapeDataString(pageToken));
+
+            using var doc = await SendJsonAsync(HttpMethod.Get, path.ToString(), accessToken, null, cancellationToken);
+            foreach (var point in ReadDataPoints(doc.RootElement))
+            {
+                if (!TryReadSleepMetrics(point, out var sleepMetrics)
+                    || sleepMetrics.Date < startDate
+                    || sleepMetrics.Date > endDate)
+                {
+                    continue;
+                }
+
+                if (!candidates.TryGetValue(sleepMetrics.Date, out var current)
+                    || IsPreferredSleep(sleepMetrics, current))
+                {
+                    candidates[sleepMetrics.Date] = sleepMetrics;
+                }
+            }
+
+            pageToken = FindString(doc.RootElement, "nextPageToken") ?? string.Empty;
+        }
+        while (!string.IsNullOrWhiteSpace(pageToken));
+
+        foreach (var (date, sleepMetrics) in candidates)
+        {
+            if (snapshots.TryGetValue(date, out var snapshot))
+            {
+                snapshot.SleepEfficiency = sleepMetrics.SleepEfficiency;
+                snapshot.DeepSleepMinutes = sleepMetrics.DeepSleepMinutes;
+                snapshot.RemSleepMinutes = sleepMetrics.RemSleepMinutes;
+            }
+        }
+    }
+
+    private static bool IsPreferredSleep(SleepMetrics candidate, SleepMetrics current) =>
+        candidate.IsMainSleep != current.IsMainSleep
+            ? candidate.IsMainSleep
+            : candidate.DurationMinutes > current.DurationMinutes;
+
+    private static void ApplyCardioLoad(DailyMetricSnapshot snapshot, JsonElement point)
+    {
+        snapshot.CardioLoad = ReadDecimal(
+            point,
+            "cardioLoad",
+            "cardio_load",
+            "cardioLoadScore",
+            "trainingLoad",
+            "training_load",
+            "load",
+            "score");
+        ApplyTargetLoad(snapshot, point);
+    }
+
+    private static void ApplyTargetLoad(DailyMetricSnapshot snapshot, JsonElement point)
+    {
+        var targetLoad = FindObject(point, "targetLoad", "target_load", "targetLoadRange", "target_load_range");
+        var min = ReadDecimal(
+                point,
+                "targetLoadMin",
+                "target_load_min",
+                "targetMin",
+                "target_min",
+                "recommendedMin",
+                "recommended_min",
+                "lowerBound",
+                "lower_bound",
+                "min",
+                "minimum")
+            ?? (targetLoad is null ? null : ReadDecimal(targetLoad.Value, "min", "minimum", "lowerBound", "lower_bound"));
+        var max = ReadDecimal(
+                point,
+                "targetLoadMax",
+                "target_load_max",
+                "targetMax",
+                "target_max",
+                "recommendedMax",
+                "recommended_max",
+                "upperBound",
+                "upper_bound",
+                "max",
+                "maximum")
+            ?? (targetLoad is null ? null : ReadDecimal(targetLoad.Value, "max", "maximum", "upperBound", "upper_bound"));
+
+        snapshot.TargetLoadMin = min ?? snapshot.TargetLoadMin;
+        snapshot.TargetLoadMax = max ?? snapshot.TargetLoadMax;
     }
 
     private static void ApplyNutrition(DailyMetricSnapshot snapshot, JsonElement point)
@@ -435,6 +599,12 @@ internal sealed class GoogleHealthApiClient(
         || snapshot.HrvRmssdMilliseconds is not null
         || snapshot.DailyVo2MaxMlKgMin is not null
         || snapshot.RunVo2MaxMlKgMin is not null
+        || snapshot.CardioLoad is not null
+        || snapshot.TargetLoadMin is not null
+        || snapshot.TargetLoadMax is not null
+        || snapshot.SleepEfficiency is not null
+        || snapshot.DeepSleepMinutes is not null
+        || snapshot.RemSleepMinutes is not null
         || snapshot.ConsumedCaloriesKcal is not null
         || snapshot.CarbohydratesGrams is not null
         || snapshot.FatGrams is not null
@@ -452,6 +622,317 @@ internal sealed class GoogleHealthApiClient(
             return rollupDataPoints.EnumerateArray();
 
         return [];
+    }
+
+    private static bool TryReadSleepMetrics(JsonElement point, out SleepMetrics metrics)
+    {
+        metrics = default;
+        var sleep = FindObject(point, "sleep")
+            ?? (FindObject(point, "interval") is not null ? point : null);
+        if (sleep is null)
+            return false;
+
+        if (!TryReadSleepDate(sleep.Value, out var date))
+            return false;
+
+        var summary = FindObject(sleep.Value, "summary", "sleepSummary");
+        var minutesAsleep = summary is null ? null : ReadDecimal(summary.Value, "minutesAsleep");
+        var minutesInSleepPeriod = summary is null
+            ? null
+            : ReadDecimal(summary.Value, "minutesInSleepPeriod", "timeInBed");
+        var durationMinutes = minutesInSleepPeriod ?? ReadDecimal(sleep.Value, "durationMinutes");
+
+        if (durationMinutes is null
+            && TryReadSleepInterval(sleep.Value, out var start, out var end))
+        {
+            durationMinutes = (decimal)(end - start).TotalMinutes;
+        }
+
+        var efficiency = ReadDecimal(sleep.Value, "sleepEfficiency", "sleep_efficiency", "efficiency")
+            ?? (summary is null ? null : ReadDecimal(summary.Value, "sleepEfficiency", "sleep_efficiency", "efficiency"));
+        if (efficiency is null && minutesAsleep is > 0 && minutesInSleepPeriod is > 0)
+            efficiency = minutesAsleep.Value / minutesInSleepPeriod.Value * 100;
+        if (efficiency is not null && efficiency is >= 0 and <= 1)
+            efficiency *= 100;
+
+        metrics = new SleepMetrics(
+            date,
+            ReadBool(sleep.Value, "mainSleep", "main_sleep") ?? false,
+            durationMinutes ?? minutesAsleep ?? 0,
+            efficiency is null ? null : Math.Round(efficiency.Value, 2, MidpointRounding.AwayFromZero),
+            ReadSleepStageMinutes(sleep.Value, "DEEP"),
+            ReadSleepStageMinutes(sleep.Value, "REM"));
+        return true;
+    }
+
+    private static bool TryReadSleepDate(JsonElement sleep, out DateOnly date)
+    {
+        if (TryReadDateStringProperty(sleep, "dateOfSleep", out date)
+            || TryReadDateObject(sleep, "date", out date))
+        {
+            return true;
+        }
+
+        var interval = FindObject(sleep, "interval");
+        if (interval is not null)
+        {
+            var civilEndTime = FindObject(interval.Value, "civilEndTime", "civil_end_time");
+            if (civilEndTime is not null && TryReadDateObject(civilEndTime.Value, "date", out date)
+                || TryReadDateTimeProperty(interval.Value, "endTime", out date)
+                || TryReadDateFromNested(interval.Value, out date))
+            {
+                return true;
+            }
+        }
+
+        return TryReadDate(sleep, out date);
+    }
+
+    private static bool TryReadSleepInterval(
+        JsonElement sleep,
+        out DateTimeOffset start,
+        out DateTimeOffset end)
+    {
+        start = default;
+        end = default;
+        var interval = FindObject(sleep, "interval");
+        return interval is not null
+            && TryReadDateTimeStringProperty(interval.Value, "startTime", out start)
+            && TryReadDateTimeStringProperty(interval.Value, "endTime", out end)
+            && end >= start;
+    }
+
+    private static int? ReadSleepStageMinutes(JsonElement element, string stageType)
+    {
+        if (element.ValueKind is JsonValueKind.Object)
+        {
+            foreach (var property in element.EnumerateObject())
+            {
+                if (string.Equals(property.Name, stageType, StringComparison.OrdinalIgnoreCase))
+                {
+                    if (TryConvertDecimal(property.Value, out var directMinutes))
+                        return (int)Math.Round(directMinutes, MidpointRounding.AwayFromZero);
+
+                    var minutes = ReadDecimal(property.Value, "minutes", "minutesSum", "durationMinutes");
+                    if (minutes is not null)
+                        return (int)Math.Round(minutes.Value, MidpointRounding.AwayFromZero);
+                }
+
+                if (string.Equals(property.Name, "stagesSummary", StringComparison.OrdinalIgnoreCase)
+                    && property.Value.ValueKind is JsonValueKind.Array)
+                {
+                    var summaryMinutes = ReadStageSummaryMinutes(property.Value, stageType);
+                    if (summaryMinutes is not null)
+                        return summaryMinutes;
+                }
+
+                if (string.Equals(property.Name, "stages", StringComparison.OrdinalIgnoreCase)
+                    && property.Value.ValueKind is JsonValueKind.Array)
+                {
+                    var segmentMinutes = ReadStageSegmentMinutes(property.Value, stageType);
+                    if (segmentMinutes is not null)
+                        return segmentMinutes;
+                }
+
+                var nested = ReadSleepStageMinutes(property.Value, stageType);
+                if (nested is not null)
+                    return nested;
+            }
+        }
+        else if (element.ValueKind is JsonValueKind.Array)
+        {
+            var summaryMinutes = ReadStageSummaryMinutes(element, stageType);
+            if (summaryMinutes is not null)
+                return summaryMinutes;
+
+            var segmentMinutes = ReadStageSegmentMinutes(element, stageType);
+            if (segmentMinutes is not null)
+                return segmentMinutes;
+
+            foreach (var item in element.EnumerateArray())
+            {
+                var nested = ReadSleepStageMinutes(item, stageType);
+                if (nested is not null)
+                    return nested;
+            }
+        }
+
+        return null;
+    }
+
+    private static int? ReadStageSummaryMinutes(JsonElement array, string stageType)
+    {
+        var total = 0;
+        var found = false;
+        foreach (var item in array.EnumerateArray())
+        {
+            if (item.ValueKind is not JsonValueKind.Object
+                || !item.TryGetProperty("type", out var type)
+                || type.ValueKind is not JsonValueKind.String
+                || !string.Equals(type.GetString(), stageType, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var minutes = ReadDecimal(item, "minutes", "minutesSum", "durationMinutes");
+            if (minutes is not null)
+            {
+                total += (int)Math.Round(minutes.Value, MidpointRounding.AwayFromZero);
+                found = true;
+            }
+        }
+
+        return found ? total : null;
+    }
+
+    private static int? ReadStageSegmentMinutes(JsonElement array, string stageType)
+    {
+        var total = 0;
+        var found = false;
+        foreach (var item in array.EnumerateArray())
+        {
+            if (item.ValueKind is not JsonValueKind.Object
+                || !item.TryGetProperty("type", out var type)
+                || type.ValueKind is not JsonValueKind.String
+                || !string.Equals(type.GetString(), stageType, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (TryReadDateTimeStringProperty(item, "startTime", out var start)
+                && TryReadDateTimeStringProperty(item, "endTime", out var end)
+                && end >= start)
+            {
+                total += (int)Math.Round((end - start).TotalMinutes, MidpointRounding.AwayFromZero);
+                found = true;
+            }
+        }
+
+        return found ? total : null;
+    }
+
+    private static JsonElement? FindObject(JsonElement element, params string[] propertyNames)
+    {
+        if (element.ValueKind is JsonValueKind.Object)
+        {
+            foreach (var property in element.EnumerateObject())
+            {
+                if (propertyNames.Any(name => string.Equals(name, property.Name, StringComparison.OrdinalIgnoreCase))
+                    && property.Value.ValueKind is JsonValueKind.Object)
+                {
+                    return property.Value;
+                }
+
+                var nested = FindObject(property.Value, propertyNames);
+                if (nested is not null)
+                    return nested;
+            }
+        }
+        else if (element.ValueKind is JsonValueKind.Array)
+        {
+            foreach (var item in element.EnumerateArray())
+            {
+                var nested = FindObject(item, propertyNames);
+                if (nested is not null)
+                    return nested;
+            }
+        }
+
+        return null;
+    }
+
+    private static bool? ReadBool(JsonElement element, params string[] propertyNames)
+    {
+        if (element.ValueKind is JsonValueKind.Object)
+        {
+            foreach (var property in element.EnumerateObject())
+            {
+                if (propertyNames.Any(name => string.Equals(name, property.Name, StringComparison.OrdinalIgnoreCase))
+                    && property.Value.ValueKind is JsonValueKind.True or JsonValueKind.False)
+                {
+                    return property.Value.GetBoolean();
+                }
+
+                var nested = ReadBool(property.Value, propertyNames);
+                if (nested is not null)
+                    return nested;
+            }
+        }
+        else if (element.ValueKind is JsonValueKind.Array)
+        {
+            foreach (var item in element.EnumerateArray())
+            {
+                var nested = ReadBool(item, propertyNames);
+                if (nested is not null)
+                    return nested;
+            }
+        }
+
+        return null;
+    }
+
+    private static bool TryReadDateStringProperty(JsonElement element, string propertyName, out DateOnly date)
+    {
+        date = default;
+        if (element.ValueKind is JsonValueKind.Object)
+        {
+            foreach (var property in element.EnumerateObject())
+            {
+                if (string.Equals(property.Name, propertyName, StringComparison.OrdinalIgnoreCase)
+                    && property.Value.ValueKind is JsonValueKind.String
+                    && DateOnly.TryParse(
+                        property.Value.GetString(),
+                        CultureInfo.InvariantCulture,
+                        DateTimeStyles.None,
+                        out date))
+                {
+                    return true;
+                }
+
+                if (TryReadDateStringProperty(property.Value, propertyName, out date))
+                    return true;
+            }
+        }
+        else if (element.ValueKind is JsonValueKind.Array)
+        {
+            foreach (var item in element.EnumerateArray())
+            {
+                if (TryReadDateStringProperty(item, propertyName, out date))
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool TryReadDateTimeProperty(JsonElement element, string propertyName, out DateOnly date)
+    {
+        date = default;
+        if (!TryReadDateTimeStringProperty(element, propertyName, out var parsed))
+            return false;
+
+        date = DateOnly.FromDateTime(parsed.UtcDateTime);
+        return true;
+    }
+
+    private static bool TryReadDateTimeStringProperty(
+        JsonElement element,
+        string propertyName,
+        out DateTimeOffset dateTime)
+    {
+        dateTime = default;
+        if (element.ValueKind is not JsonValueKind.Object
+            || !element.TryGetProperty(propertyName, out var value)
+            || value.ValueKind is not JsonValueKind.String)
+        {
+            return false;
+        }
+
+        return DateTimeOffset.TryParse(
+            value.GetString(),
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.AssumeUniversal,
+            out dateTime);
     }
 
     private static IEnumerable<(DateOnly Start, DateOnly End)> ChunkRange(DateOnly startDate, DateOnly endDate, int maxDays)
@@ -684,6 +1165,14 @@ internal sealed class GoogleHealthApiClient(
         };
     }
 }
+
+internal readonly record struct SleepMetrics(
+    DateOnly Date,
+    bool IsMainSleep,
+    decimal DurationMinutes,
+    decimal? SleepEfficiency,
+    int? DeepSleepMinutes,
+    int? RemSleepMinutes);
 
 internal sealed class GoogleHealthApiException(HttpStatusCode statusCode, string message) : HttpRequestException(message, null, statusCode)
 {

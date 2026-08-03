@@ -59,6 +59,12 @@ public sealed class GoogleHealthSyncServiceTests : IAsyncLifetime
             HrvRmssdMilliseconds = 42.5m,
             DailyVo2MaxMlKgMin = 46.0m,
             RunVo2MaxMlKgMin = 47.0m,
+            CardioLoad = 78m,
+            TargetLoadMin = 60m,
+            TargetLoadMax = 90m,
+            SleepEfficiency = 91m,
+            DeepSleepMinutes = 85,
+            RemSleepMinutes = 105,
             ConsumedCaloriesKcal = 2000,
             CarbohydratesGrams = 200m,
             FatGrams = 60m,
@@ -96,6 +102,12 @@ public sealed class GoogleHealthSyncServiceTests : IAsyncLifetime
         Assert.Equal(42.5m, stored.HrvRmssdMilliseconds);
         Assert.Equal(46.0m, stored.DailyVo2MaxMlKgMin);
         Assert.Equal(47.0m, stored.RunVo2MaxMlKgMin);
+        Assert.Equal(78m, stored.CardioLoad);
+        Assert.Equal(60m, stored.TargetLoadMin);
+        Assert.Equal(90m, stored.TargetLoadMax);
+        Assert.Equal(91m, stored.SleepEfficiency);
+        Assert.Equal(85, stored.DeepSleepMinutes);
+        Assert.Equal(105, stored.RemSleepMinutes);
         Assert.Equal(2000, stored.ConsumedCaloriesKcal);
         Assert.Equal(200m, stored.CarbohydratesGrams);
         Assert.Equal(60m, stored.FatGrams);
@@ -136,6 +148,107 @@ public sealed class GoogleHealthSyncServiceTests : IAsyncLifetime
 
         var stored = await _dbContext.DailyMetricSnapshots.SingleAsync();
         Assert.Equal(62, stored.RestingHeartRateBpm);
+    }
+
+    [Fact]
+    public async Task SyncRecentDaysAsync_Merge_StoresCardioLoadAndSleepValues()
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var handler = new StubHandler(req =>
+        {
+            var path = req.RequestUri!.ToString();
+            if (path.Contains("daily-cardio-load"))
+                return Json($$$"""
+                    {
+                      "dataPoints": [
+                        {
+                          "date": {"year":{{{today.Year}}},"month":{{{today.Month}}},"day":{{{today.Day}}}},
+                          "value": {"cardioLoad": 82, "targetLoad": {"min": 60, "max": 95}}
+                        }
+                      ]
+                    }
+                    """);
+            if (path.Contains("dataTypes/sleep/dataPoints"))
+                return Json($$$"""
+                    {
+                      "dataPoints": [
+                        {
+                          "value": {
+                            "sleep": {
+                              "interval": {
+                                "civilEndTime": {"date": {"year":{{{today.Year}}},"month":{{{today.Month}}},"day":{{{today.Day}}}}}
+                              },
+                              "metadata": {"mainSleep": true},
+                              "summary": {
+                                "sleepEfficiency": 88,
+                                "stagesSummary": [
+                                  {"type": "DEEP", "minutes": 70},
+                                  {"type": "REM", "minutes": 100}
+                                ]
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    }
+                    """);
+            return Json("""{}""");
+        });
+
+        await new GoogleHealthSyncService(
+            _dbContext,
+            new FakeAuthorizationService(),
+            new GoogleHealthApiClient(
+                new HttpClient(handler) { BaseAddress = new Uri("https://health.googleapis.com/v4/") },
+                Options.Create(new GoogleHealthHttpLoggingOptions()),
+                NullLogger<GoogleHealthApiClient>.Instance),
+            NullLogger<GoogleHealthSyncService>.Instance).SyncRecentDaysAsync(1);
+
+        var stored = await _dbContext.DailyMetricSnapshots.SingleAsync();
+        Assert.Equal(82m, stored.CardioLoad);
+        Assert.Equal(60m, stored.TargetLoadMin);
+        Assert.Equal(95m, stored.TargetLoadMax);
+        Assert.Equal(88m, stored.SleepEfficiency);
+        Assert.Equal(70, stored.DeepSleepMinutes);
+        Assert.Equal(100, stored.RemSleepMinutes);
+    }
+
+    [Fact]
+    public async Task SyncRecentDaysAsync_RecalculatesAcwrFromPersistedHistory()
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        _dbContext.DailyMetricSnapshots.AddRange(
+            Enumerable.Range(0, 28).Select(offset => new DailyMetricSnapshot
+            {
+                MetricDate = today.AddDays(-offset),
+                CardioLoad = 100m
+            }));
+        await _dbContext.SaveChangesAsync();
+
+        var handler = new StubHandler(req =>
+        {
+            if (req.RequestUri!.ToString().Contains("daily-cardio-load"))
+                return Json($$$"""
+                    {
+                      "dataPoints": [
+                        {
+                          "date": {"year":{{{today.Year}}},"month":{{{today.Month}}},"day":{{{today.Day}}}},
+                          "value": {"cardioLoad": 110}
+                        }
+                      ]
+                    }
+                    """);
+            return Json("""{}""");
+        });
+
+        await CreateService(handler).SyncRecentDaysAsync(1);
+
+        var stored = await _dbContext.DailyMetricSnapshots
+            .SingleAsync(snapshot => snapshot.MetricDate == today);
+        Assert.Equal(1.01m, stored.Acwr);
+        Assert.All(
+            await _dbContext.DailyMetricSnapshots.Where(snapshot => snapshot.MetricDate < today).ToListAsync(),
+            snapshot => Assert.Null(snapshot.Acwr));
     }
 
     // ── PartialSuccess outcome ───────────────────────────────────────────────

@@ -137,6 +137,99 @@ public sealed class GoogleHealthApiClientTests
     }
 
     [Fact]
+    public async Task FetchDailyMetricsAsync_MapsCardioLoadTargetRangeAndPreferredSleepSession()
+    {
+        var handler = new StubHttpMessageHandler(request =>
+        {
+            var path = request.RequestUri!.ToString();
+            if (path.Contains("users/me/settings"))
+                return Json("""{"timeZone":"UTC"}""");
+
+            if (path.Contains("daily-cardio-load"))
+                return Json("""
+                    {
+                      "dataPoints": [
+                        {
+                          "date": {"year": 2026, "month": 7, "day": 18},
+                          "value": {
+                            "dailyCardioLoad": {
+                              "cardioLoad": 78,
+                              "targetLoad": {"min": 60, "max": 90}
+                            }
+                          }
+                        }
+                      ]
+                    }
+                    """);
+
+            if (path.Contains("dataTypes/sleep/dataPoints"))
+                return Json("""
+                    {
+                      "dataPoints": [
+                        {
+                          "value": {
+                            "sleep": {
+                              "interval": {
+                                "civilStartTime": {"date": {"year": 2026, "month": 7, "day": 17}},
+                                "civilEndTime": {"date": {"year": 2026, "month": 7, "day": 18}}
+                              },
+                              "metadata": {"mainSleep": false},
+                              "summary": {
+                                "sleepEfficiency": 0.82,
+                                "stagesSummary": [
+                                  {"type": "DEEP", "minutes": 40},
+                                  {"type": "REM", "minutes": 55}
+                                ]
+                              }
+                            }
+                          }
+                        },
+                        {
+                          "value": {
+                            "sleep": {
+                              "interval": {
+                                "civilStartTime": {"date": {"year": 2026, "month": 7, "day": 17}},
+                                "civilEndTime": {"date": {"year": 2026, "month": 7, "day": 18}}
+                              },
+                              "metadata": {"mainSleep": true},
+                              "summary": {
+                                "minutesAsleep": "273",
+                                "minutesInSleepPeriod": "300",
+                                "stagesSummary": [
+                                  {"type": "DEEP", "minutes": 85},
+                                  {"type": "REM", "minutes": 105}
+                                ]
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    }
+                    """);
+
+            return Json("""{}""");
+        });
+
+        var client = CreateClient(handler);
+        var snapshots = await client.FetchDailyMetricsAsync(
+            "token",
+            new DateOnly(2026, 7, 18),
+            new DateOnly(2026, 7, 18),
+            CancellationToken.None);
+
+        var snapshot = Assert.Single(snapshots);
+        Assert.Equal(78m, snapshot.CardioLoad);
+        Assert.Equal(60m, snapshot.TargetLoadMin);
+        Assert.Equal(90m, snapshot.TargetLoadMax);
+        Assert.Equal(91m, snapshot.SleepEfficiency);
+        Assert.Equal(85, snapshot.DeepSleepMinutes);
+        Assert.Equal(105, snapshot.RemSleepMinutes);
+
+        var sleepRequest = Assert.Single(handler.Requests, request => request.Uri.Contains("dataTypes/sleep/dataPoints"));
+        Assert.Contains("sleep.interval.civil_end_time", Uri.UnescapeDataString(sleepRequest.Uri));
+    }
+
+    [Fact]
     public async Task FetchDailyMetricsAsync_ListFiltersUseExclusiveEndDate()
     {
         var handler = new StubHttpMessageHandler(request =>

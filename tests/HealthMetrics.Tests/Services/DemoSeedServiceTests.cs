@@ -122,7 +122,15 @@ public sealed class DemoSeedServiceTests : IAsyncLifetime
         {
             Assert.InRange(s.RestingHeartRateBpm!.Value, 52, 67);
             Assert.InRange(s.HrvRmssdMilliseconds!.Value, 30m, 65m);
+            Assert.InRange(s.CardioLoad!.Value, 45m, 100m);
+            Assert.InRange(s.TargetLoadMin!.Value, 45m, 65m);
+            Assert.InRange(s.TargetLoadMax!.Value, 65m, 110m);
+            Assert.InRange(s.SleepEfficiency!.Value, 82m, 97m);
+            Assert.InRange(s.DeepSleepMinutes!.Value, 45, 110);
+            Assert.InRange(s.RemSleepMinutes!.Value, 70, 150);
             Assert.InRange(s.ConsumedCaloriesKcal!.Value, 1700, 2599);
         }
+
+        Assert.Contains(snapshots, snapshot => snapshot.Acwr is not null);
     }
 }

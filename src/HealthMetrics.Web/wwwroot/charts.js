@@ -127,6 +127,100 @@ window.HealthCharts = (function () {
             });
         },
 
+        renderLoad(canvasId, labels, cardioLoadData, targetMinData, targetMaxData) {
+            if (charts[canvasId]) {
+                charts[canvasId].destroy();
+            }
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+
+            const hasCardioLoad = cardioLoadData.some(v => v !== null);
+            const hasTargetRange = targetMinData.some(v => v !== null) || targetMaxData.some(v => v !== null);
+            const colors = themeColors();
+            const datasets = [];
+
+            if (hasTargetRange) {
+                datasets.push({
+                    label: "Target Load min",
+                    data: targetMinData,
+                    type: "line",
+                    borderColor: "rgba(25, 135, 84, 0)",
+                    backgroundColor: "rgba(25, 135, 84, 0)",
+                    pointRadius: 0,
+                    borderWidth: 0,
+                    fill: false,
+                    spanGaps: true,
+                    yAxisID: "yLoad"
+                });
+                datasets.push({
+                    label: "Target Load range",
+                    data: targetMaxData,
+                    type: "line",
+                    borderColor: "rgba(25, 135, 84, 0.7)",
+                    backgroundColor: "rgba(25, 135, 84, 0.16)",
+                    pointRadius: 0,
+                    borderWidth: 1,
+                    fill: "-1",
+                    spanGaps: true,
+                    yAxisID: "yLoad"
+                });
+            }
+
+            if (hasCardioLoad) {
+                datasets.push({
+                    label: "Cardio Load",
+                    data: cardioLoadData,
+                    type: "bar",
+                    backgroundColor: "rgba(13, 110, 253, 0.62)",
+                    borderColor: "rgb(13, 110, 253)",
+                    borderWidth: 1,
+                    yAxisID: "yLoad"
+                });
+            }
+
+            charts[canvasId] = new Chart(canvas, {
+                type: "bar",
+                data: { labels, datasets },
+                options: {
+                    responsive: true,
+                    interaction: { mode: "index", intersect: false },
+                    plugins: {
+                        legend: {
+                            position: "top",
+                            labels: {
+                                color: colors.text,
+                                filter: item => item.text !== "Target Load min"
+                            }
+                        },
+                        tooltip: {
+                            titleColor: colors.text,
+                            bodyColor: colors.text,
+                            backgroundColor: colors.tooltipBackground,
+                            borderColor: colors.grid,
+                            borderWidth: 1
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: { display: false, color: colors.muted },
+                            ticks: { color: colors.muted },
+                            grid: { color: colors.grid },
+                            border: { color: colors.grid }
+                        },
+                        yLoad: {
+                            type: "linear",
+                            position: "left",
+                            beginAtZero: true,
+                            title: { display: true, text: "Load", color: colors.muted },
+                            ticks: { color: colors.muted },
+                            grid: { color: colors.grid },
+                            border: { color: colors.grid }
+                        }
+                    }
+                }
+            });
+        },
+
         destroy(canvasId) {
             if (charts[canvasId]) {
                 charts[canvasId].destroy();

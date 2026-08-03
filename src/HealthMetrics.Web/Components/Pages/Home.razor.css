@@ -24,3 +24,7 @@
 .google-health-connect.is-pending .google-health-connect-status {
     display: inline-block;
 }
+
+.bg-orange {
+    background-color: #fd7e14 !important;
+}

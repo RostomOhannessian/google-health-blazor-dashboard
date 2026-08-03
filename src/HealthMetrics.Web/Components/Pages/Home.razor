@@ -18,7 +18,7 @@
         <button type="button" class="btn @(selectedDays == 90 ? "btn-primary" : "btn-outline-primary")" @onclick="@(() => ChangeRangeAsync(90))">90 d</button>
     </div>
 </div>
-<p class="text-muted mb-3">Daily heart, recovery, fitness, and nutrition metrics synced from the Google Health API and persisted locally.</p>
+<p class="text-muted mb-3">Daily heart, recovery, cardio load, sleep, fitness, and nutrition metrics synced from the Google Health API and persisted locally.</p>
 
 <div class="d-flex flex-wrap gap-2 mb-4">
     @if (connectionStatus?.IsConnected != true)
@@ -50,7 +50,7 @@
 }
 
 <div class="row g-3 mb-4">
-    <div class="col-sm-6 col-xl-3">
+    <div class="col-sm-6 col-xl-2">
         <div class="card h-100 @(connectionStatus?.IsConnected == true ? "border-success" : "border-warning")">
             <div class="card-body">
                 <h6 class="card-subtitle text-muted mb-1">Google Health connection</h6>
@@ -77,7 +77,7 @@
             </div>
         </div>
     </div>
-    <div class="col-sm-6 col-xl-3">
+    <div class="col-sm-6 col-xl-2">
         <div class="card h-100">
             <div class="card-body">
                 <h6 class="card-subtitle text-muted mb-1">Last sync</h6>
@@ -89,7 +89,7 @@
             </div>
         </div>
     </div>
-    <div class="col-sm-6 col-xl-3">
+    <div class="col-sm-6 col-xl-2">
         <div class="card h-100">
             <div class="card-body">
                 <h6 class="card-subtitle text-muted mb-1">Resting HR</h6>
@@ -100,7 +100,7 @@
             </div>
         </div>
     </div>
-    <div class="col-sm-6 col-xl-3">
+    <div class="col-sm-6 col-xl-2">
         <div class="card h-100">
             <div class="card-body">
                 <h6 class="card-subtitle text-muted mb-1">HRV RMSSD</h6>
@@ -111,12 +111,42 @@
             </div>
         </div>
     </div>
+    <div class="col-sm-6 col-xl-2">
+        <div class="card h-100">
+            <div class="card-body">
+                <h6 class="card-subtitle text-muted mb-1">Daily Cardio Load</h6>
+                <p class="card-text fw-semibold mb-0">@CardioLoadText(summary)</p>
+                <small class="text-muted">Current day vs. recommended target</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-2">
+        <div class="card h-100">
+            <div class="card-body">
+                <h6 class="card-subtitle text-muted mb-1">ACWR (Training Strain)</h6>
+                <p class="card-text fw-semibold mb-0">
+                    @Display(summary?.LatestAcwr, "F2")
+                    @if (summary?.LatestAcwr is not null)
+                    {
+                        <span class="badge @AcwrBadge(summary.LatestAcwrStatus)">@AcwrLabel(summary.LatestAcwrStatus)</span>
+                    }
+                </p>
+                <small class="text-muted">7-day acute / 28-day chronic</small>
+            </div>
+        </div>
+    </div>
 </div>
 
-@if (metrics.Any(m => m.RestingHeartRateBpm.HasValue || m.HrvRmssdMilliseconds.HasValue))
+@if (HasHeartMetrics || HasLoadMetrics)
 {
     <div class="card mb-4">
-        <div class="card-header fw-semibold">Heart rate &amp; HRV trend</div>
+        <div class="card-header d-flex align-items-center justify-content-between gap-2 flex-wrap">
+            <span class="fw-semibold">@(chartMode == ChartMode.Load ? "Cardio & load strain" : "Heart rate & HRV trend")</span>
+            <div class="btn-group btn-group-sm" role="group" aria-label="Chart metric">
+                <button type="button" class="btn @(chartMode == ChartMode.Heart ? "btn-primary" : "btn-outline-primary")" @onclick="@(() => SetChartModeAsync(ChartMode.Heart))">Heart &amp; HRV</button>
+                <button type="button" class="btn @(chartMode == ChartMode.Load ? "btn-primary" : "btn-outline-primary")" @onclick="@(() => SetChartModeAsync(ChartMode.Load))" disabled="@(!HasLoadMetrics)">Cardio &amp; Load Strain</button>
+            </div>
+        </div>
         <div class="card-body py-2">
             <canvas id="metricsChart" style="max-height: 260px;"></canvas>
         </div>
@@ -134,22 +164,26 @@
     <table class="table table-striped table-sm table-hover">
         <thead>
             <tr>
-                <th>Date</th>
-                <th>Resting HR</th>
-                <th>HRV (ms)</th>
-                <th>Daily VO2 Max</th>
-                <th>Run VO2 Max</th>
-                <th>Calories</th>
-                <th>Carbs (g)</th>
-                <th>Fat (g)</th>
-                <th>Protein (g)</th>
+                <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("date"))">Date @SortIndicator("date")</button></th>
+                <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("restingHr"))">Resting HR @SortIndicator("restingHr")</button></th>
+                <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("hrv"))">HRV (ms) @SortIndicator("hrv")</button></th>
+                <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("dailyVo2"))">Daily VO2 Max @SortIndicator("dailyVo2")</button></th>
+                <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("runVo2"))">Run VO2 Max @SortIndicator("runVo2")</button></th>
+                <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("cardioLoad"))">Cardio Load @SortIndicator("cardioLoad")</button></th>
+                <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("targetLoad"))">Target Load @SortIndicator("targetLoad")</button></th>
+                <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("acwr"))">ACWR @SortIndicator("acwr")</button></th>
+                <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("sleepEfficiency"))">Sleep Efficiency (%) @SortIndicator("sleepEfficiency")</button></th>
+                <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("calories"))">Calories @SortIndicator("calories")</button></th>
+                <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("carbs"))">Carbs (g) @SortIndicator("carbs")</button></th>
+                <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("fat"))">Fat (g) @SortIndicator("fat")</button></th>
+                <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("protein"))">Protein (g) @SortIndicator("protein")</button></th>
             </tr>
         </thead>
         <tbody>
             @if (metrics.Count == 0)
             {
                 <tr>
-                    <td colspan="9" class="text-center text-muted py-3">
+                    <td colspan="13" class="text-center text-muted py-3">
                         @(connectionStatus?.IsConnected == true
                             ? "No data for this range — run a sync first."
                             : "Connect Google Health and run sync to start tracking.")
@@ -158,7 +192,7 @@
             }
             else
             {
-                @foreach (var metric in metrics)
+                @foreach (var metric in SortedMetrics)
                 {
                     <tr>
                         <td>@metric.MetricDate.ToString("MMM d")</td>
@@ -166,6 +200,10 @@
                         <td>@Display(metric.HrvRmssdMilliseconds, "F3")</td>
                         <td>@Display(metric.DailyVo2MaxMlKgMin, "F1")</td>
                         <td>@Display(metric.RunVo2MaxMlKgMin)</td>
+                        <td>@Display(metric.CardioLoad, "F1")</td>
+                        <td>@TargetLoadText(metric.TargetLoadMin, metric.TargetLoadMax)</td>
+                        <td>@Display(metric.Acwr, "F2")</td>
+                        <td>@Display(metric.SleepEfficiency, "F2")</td>
                         <td>@Display(metric.ConsumedCaloriesKcal)</td>
                         <td>@Display(metric.CarbohydratesGrams, "F2")</td>
                         <td>@Display(metric.FatGrams, "F2")</td>
@@ -239,6 +277,33 @@
     private string? seedMessage;
     private int selectedDays = 30;
     private bool chartNeedsRender;
+    private ChartMode chartMode = ChartMode.Heart;
+    private string sortColumn = "date";
+    private bool sortDescending;
+
+    private bool HasHeartMetrics =>
+        metrics.Any(m => m.RestingHeartRateBpm.HasValue || m.HrvRmssdMilliseconds.HasValue);
+
+    private bool HasLoadMetrics =>
+        metrics.Any(m => m.CardioLoad.HasValue || m.TargetLoadMin.HasValue || m.TargetLoadMax.HasValue);
+
+    private IEnumerable<DailyMetricSnapshot> SortedMetrics =>
+        sortColumn switch
+        {
+            "restingHr" => Sort(metrics, metric => metric.RestingHeartRateBpm),
+            "hrv" => Sort(metrics, metric => metric.HrvRmssdMilliseconds),
+            "dailyVo2" => Sort(metrics, metric => metric.DailyVo2MaxMlKgMin),
+            "runVo2" => Sort(metrics, metric => metric.RunVo2MaxMlKgMin),
+            "cardioLoad" => Sort(metrics, metric => metric.CardioLoad),
+            "targetLoad" => Sort(metrics, metric => metric.TargetLoadMin),
+            "acwr" => Sort(metrics, metric => metric.Acwr),
+            "sleepEfficiency" => Sort(metrics, metric => metric.SleepEfficiency),
+            "calories" => Sort(metrics, metric => metric.ConsumedCaloriesKcal),
+            "carbs" => Sort(metrics, metric => metric.CarbohydratesGrams),
+            "fat" => Sort(metrics, metric => metric.FatGrams),
+            "protein" => Sort(metrics, metric => metric.ProteinGrams),
+            _ => Sort(metrics, metric => metric.MetricDate)
+        };
 
     protected override async Task OnInitializedAsync()
     {
@@ -253,15 +318,36 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (chartNeedsRender && metrics.Any(m => m.RestingHeartRateBpm.HasValue || m.HrvRmssdMilliseconds.HasValue))
+        var chartHasData = chartMode == ChartMode.Load ? HasLoadMetrics : HasHeartMetrics;
+        if (chartNeedsRender && chartHasData)
         {
             chartNeedsRender = false;
             var ordered = metrics.OrderBy(m => m.MetricDate).ToList();
             var labels   = ordered.Select(m => m.MetricDate.ToString("MMM d")).ToArray();
-            var hrData   = ordered.Select(m => (object?)(m.RestingHeartRateBpm.HasValue ? m.RestingHeartRateBpm.Value : (int?)null)).ToArray();
-            var hrvData  = ordered.Select(m => (object?)(m.HrvRmssdMilliseconds.HasValue ? (double)m.HrvRmssdMilliseconds.Value : (double?)null)).ToArray();
-            await JS.InvokeVoidAsync("HealthCharts.render", "metricsChart", labels, hrData, hrvData);
+            if (chartMode == ChartMode.Load)
+            {
+                var cardioLoadData = ordered.Select(m => (object?)m.CardioLoad).ToArray();
+                var targetMinData = ordered.Select(m => (object?)m.TargetLoadMin).ToArray();
+                var targetMaxData = ordered.Select(m => (object?)m.TargetLoadMax).ToArray();
+                await JS.InvokeVoidAsync("HealthCharts.renderLoad", "metricsChart", labels, cardioLoadData, targetMinData, targetMaxData);
+            }
+            else
+            {
+                var hrData   = ordered.Select(m => (object?)(m.RestingHeartRateBpm.HasValue ? m.RestingHeartRateBpm.Value : (int?)null)).ToArray();
+                var hrvData  = ordered.Select(m => (object?)(m.HrvRmssdMilliseconds.HasValue ? (double)m.HrvRmssdMilliseconds.Value : (double?)null)).ToArray();
+                await JS.InvokeVoidAsync("HealthCharts.render", "metricsChart", labels, hrData, hrvData);
+            }
         }
+    }
+
+    private async Task SetChartModeAsync(ChartMode mode)
+    {
+        if (mode == ChartMode.Load && !HasLoadMetrics)
+            return;
+
+        chartMode = mode;
+        chartNeedsRender = true;
+        await InvokeAsync(StateHasChanged);
     }
 
     private async Task SyncNowAsync()
@@ -354,6 +440,61 @@
         where T : struct, IFormattable =>
         value is null ? "—" : value.Value.ToString(format, System.Globalization.CultureInfo.CurrentCulture);
 
+    private static string CardioLoadText(MetricSummary? metricSummary)
+    {
+        if (metricSummary?.LatestCardioLoad is null)
+            return "—";
+
+        return $"{metricSummary.LatestCardioLoad.Value:F1} / Target: {TargetLoadText(metricSummary.LatestTargetLoadMin, metricSummary.LatestTargetLoadMax)}";
+    }
+
+    private static string TargetLoadText(decimal? min, decimal? max)
+    {
+        if (min is null && max is null)
+            return "—";
+
+        var minText = min?.ToString("F1", System.Globalization.CultureInfo.CurrentCulture) ?? "—";
+        var maxText = max?.ToString("F1", System.Globalization.CultureInfo.CurrentCulture) ?? "—";
+        return $"{minText}–{maxText}";
+    }
+
+    private void SortBy(string column)
+    {
+        if (sortColumn == column)
+            sortDescending = !sortDescending;
+        else
+        {
+            sortColumn = column;
+            sortDescending = false;
+        }
+    }
+
+    private IEnumerable<DailyMetricSnapshot> Sort<T>(
+        IEnumerable<DailyMetricSnapshot> source,
+        Func<DailyMetricSnapshot, T> selector) =>
+        sortDescending ? source.OrderByDescending(selector) : source.OrderBy(selector);
+
+    private string SortIndicator(string column) =>
+        sortColumn == column ? (sortDescending ? "▼" : "▲") : string.Empty;
+
+    private static string AcwrLabel(AcwrStatus status) => status switch
+    {
+        AcwrStatus.Undertraining => "Undertraining",
+        AcwrStatus.OptimalZone => "Optimal Zone",
+        AcwrStatus.Overreaching => "Overreaching",
+        AcwrStatus.HighDangerZone => "High Danger Zone",
+        _ => "Insufficient data"
+    };
+
+    private static string AcwrBadge(AcwrStatus status) => status switch
+    {
+        AcwrStatus.Undertraining => "bg-warning text-dark",
+        AcwrStatus.OptimalZone => "bg-success",
+        AcwrStatus.Overreaching => "bg-orange text-dark",
+        AcwrStatus.HighDangerZone => "bg-danger",
+        _ => "bg-secondary"
+    };
+
     private static string SummaryText(object? latest, double? avg7d, string unit, string decimalFormat = "F1")
     {
         if (latest is null) return "—";
@@ -392,5 +533,11 @@
         return span.TotalSeconds < 60
             ? $"{span.TotalSeconds:F0}s"
             : $"{span.TotalMinutes:F1}m";
+    }
+
+    private enum ChartMode
+    {
+        Heart,
+        Load
     }
 }

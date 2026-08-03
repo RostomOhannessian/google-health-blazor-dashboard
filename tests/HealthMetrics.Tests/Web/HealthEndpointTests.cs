@@ -45,6 +45,7 @@ public sealed class HealthEndpointTests
         Assert.Contains("scope=openid email https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fgooglehealth.health_metrics_and_measurements.readonly", location);
         Assert.Contains("googlehealth.activity_and_fitness.readonly", location);
         Assert.Contains("googlehealth.nutrition.readonly", location);
+        Assert.Contains("googlehealth.sleep.readonly", location);
     }
 
     [Fact]
@@ -70,7 +71,7 @@ public sealed class HealthEndpointTests
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("text/csv", response.Content.Headers.ContentType!.MediaType);
-        Assert.StartsWith("Date,RestingHR_bpm,HRV_RMSSD_ms,DailyVO2Max_ml_kg_min,RunVO2Max_ml_kg_min,Calories_kcal,Carbs_g,Fat_g,Protein_g", csv);
+        Assert.StartsWith("Date,RestingHR_bpm,HRV_RMSSD_ms,DailyVO2Max_ml_kg_min,RunVO2Max_ml_kg_min,CardioLoad,TargetLoadMin,TargetLoadMax,ACWR,SleepEfficiency_pct,DeepSleep_min,RemSleep_min,Calories_kcal,Carbs_g,Fat_g,Protein_g", csv);
         Assert.DoesNotContain("Sodium", csv);
         Assert.DoesNotContain("Fiber", csv);
     }
@@ -79,7 +80,7 @@ public sealed class HealthEndpointTests
     public async Task MetricsExport_UsesInvariantCultureForDecimals()
     {
         // The fake metric query returns rows with decimal fields (HRV 42.5, Carbs 260.5 etc.).
-        // Each data row must have exactly 9 comma-separated columns regardless of the host
+        // Each data row must have exactly 16 comma-separated columns regardless of the host
         // locale. A comma-decimal locale would produce extra columns if formatting were
         // culture-dependent.
         await using var factory = new HealthMetricsWebApplicationFactory();
@@ -91,10 +92,11 @@ public sealed class HealthEndpointTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var lines = csv.Split('\n', StringSplitOptions.RemoveEmptyEntries);
         foreach (var line in lines.Skip(1)) // skip header
-            Assert.Equal(9, line.TrimEnd('\r').Split(',').Length);
+            Assert.Equal(16, line.TrimEnd('\r').Split(',').Length);
 
         Assert.Contains("42.5", csv);
         Assert.Contains("260.5", csv);
+        Assert.Contains("78", csv);
     }
 
     [Fact]
@@ -146,6 +148,13 @@ public sealed class HealthEndpointTests
         Assert.Contains("260.50", html);
         Assert.Contains("70.00", html);
         Assert.Contains("120.00", html);
+        Assert.Contains("78.0 / Target:", html);
+        Assert.Contains("60.0", html);
+        Assert.Contains("90.0", html);
+        Assert.Contains("1.05", html);
+        Assert.Contains("Optimal Zone", html);
+        Assert.Contains("Cardio Load", html);
+        Assert.Contains("Sleep Efficiency (%)", html);
     }
 
     private sealed class HealthMetricsWebApplicationFactory : WebApplicationFactory<Program>
@@ -169,7 +178,8 @@ public sealed class HealthEndpointTests
                     new KeyValuePair<string, string?>("GoogleHealthApi:Scopes:1", "email"),
                     new KeyValuePair<string, string?>("GoogleHealthApi:Scopes:2", "https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly"),
                     new KeyValuePair<string, string?>("GoogleHealthApi:Scopes:3", "https://www.googleapis.com/auth/googlehealth.activity_and_fitness.readonly"),
-                    new KeyValuePair<string, string?>("GoogleHealthApi:Scopes:4", "https://www.googleapis.com/auth/googlehealth.nutrition.readonly")
+                    new KeyValuePair<string, string?>("GoogleHealthApi:Scopes:4", "https://www.googleapis.com/auth/googlehealth.nutrition.readonly"),
+                    new KeyValuePair<string, string?>("GoogleHealthApi:Scopes:5", "https://www.googleapis.com/auth/googlehealth.sleep.readonly")
                 ]);
             });
             builder.ConfigureServices(services =>
@@ -247,6 +257,13 @@ public sealed class HealthEndpointTests
                     HrvRmssdMilliseconds = 42.5m,
                     DailyVo2MaxMlKgMin = 46.8m,
                     RunVo2MaxMlKgMin = 47.2m,
+                    CardioLoad = 78m,
+                    TargetLoadMin = 60m,
+                    TargetLoadMax = 90m,
+                    Acwr = 1.05m,
+                    SleepEfficiency = 91m,
+                    DeepSleepMinutes = 85,
+                    RemSleepMinutes = 105,
                     ConsumedCaloriesKcal = 2200,
                     CarbohydratesGrams = 260.5m,
                     FatGrams = 70m,

@@ -19,7 +19,7 @@
         <button type="button" class="btn @(selectedDays == 90 ? "btn-primary" : "btn-outline-primary")" @onclick="@(() => ChangeRangeAsync(90))">90 d</button>
     </div>
 </div>
-<p class="text-muted mb-3">Daily heart, recovery, provider Active Zone Minutes, manually entered Cardio Load, sleep, fitness, and nutrition metrics persisted locally.</p>
+<p class="text-muted mb-3">Daily heart, recovery, manually entered Cardio Load, sleep, fitness, and nutrition metrics persisted locally.</p>
 
 <div class="d-flex flex-wrap gap-2 mb-4">
     @if (connectionStatus?.IsConnected != true)
@@ -145,30 +145,6 @@
             </div>
         </div>
     </div>
-    <div class="col-sm-6 col-xl-2">
-        <div class="card h-100">
-            <div class="card-body">
-                <h6 class="card-subtitle text-muted mb-1">Active Zone Minutes (AZM)</h6>
-                <p class="card-text fw-semibold mb-0">@Display(summary?.LatestActiveZoneMinutes, "F1")</p>
-                <small class="text-muted">Synced provider metric from Google Health</small>
-            </div>
-        </div>
-    </div>
-    <div class="col-sm-6 col-xl-2">
-        <div class="card h-100">
-            <div class="card-body">
-                <h6 class="card-subtitle text-muted mb-1">AZM ACWR</h6>
-                <p class="card-text fw-semibold mb-0">
-                    @Display(summary?.LatestActiveZoneMinutesAcwr, "F2")
-                    @if (summary?.LatestActiveZoneMinutesAcwr is not null)
-                    {
-                        <span class="badge @AcwrBadge(summary.LatestActiveZoneMinutesAcwrStatus)">@AcwrLabel(summary.LatestActiveZoneMinutesAcwrStatus)</span>
-                    }
-                </p>
-                <small class="text-muted">Calculated from synced provider AZM</small>
-            </div>
-        </div>
-    </div>
 </div>
 
 <section class="card mb-4" id="manual-load-entry" aria-labelledby="manual-load-entry-heading" tabindex="-1">
@@ -177,8 +153,7 @@
     </div>
     <div class="card-body">
         <p class="mb-3" id="manual-load-help">
-            Record proprietary manual Cardio Load and Target Load values. They drive the Manual Cardio ACWR calculation only;
-            they never overwrite Google Health Active Zone Minutes (AZM) or AZM ACWR.
+            Record proprietary manual Cardio Load and Target Load values. They drive the Manual Cardio ACWR calculation only.
         </p>
         <EditForm Model="manualLoadForm" OnSubmit="SaveManualLoadAsync" FormName="manual-load-entry-form">
             <fieldset aria-describedby="manual-load-help">
@@ -205,37 +180,17 @@
                         <div class="form-text" id="manual-cardio-load-help">Optional proprietary daily load.</div>
                     </div>
                     <div class="col-12 col-md-4 col-xl-3">
-                        <label class="form-label" for="manual-target-min">Target minimum (load points)</label>
-                        <InputNumber id="manual-target-min"
-                                     class="@($"form-control {(HasManualTargetRangeError ? "is-invalid" : string.Empty)}")"
-                                     @bind-Value="manualLoadForm.TargetLoadMin"
-                                     @bind-Value:after="ValidateManualTargetRange"
+                        <label class="form-label" for="manual-target">Target (load points)</label>
+                        <InputNumber id="manual-target"
+                                     class="form-control"
+                                     @bind-Value="manualLoadForm.TargetLoad"
                                      min="0"
                                      step="0.1"
                                      inputmode="decimal"
-                                     aria-invalid="@HasManualTargetRangeError"
-                                     aria-describedby="@ManualTargetInputDescription" />
-                        <div class="form-text" id="manual-target-help">Optional lower end of your manual target range.</div>
-                    </div>
-                    <div class="col-12 col-md-4 col-xl-3">
-                        <label class="form-label" for="manual-target-max">Target maximum (load points)</label>
-                        <InputNumber id="manual-target-max"
-                                     class="@($"form-control {(HasManualTargetRangeError ? "is-invalid" : string.Empty)}")"
-                                     @bind-Value="manualLoadForm.TargetLoadMax"
-                                     @bind-Value:after="ValidateManualTargetRange"
-                                     min="0"
-                                     step="0.1"
-                                     inputmode="decimal"
-                                     aria-invalid="@HasManualTargetRangeError"
-                                     aria-describedby="@ManualTargetInputDescription" />
+                                     aria-describedby="manual-target-help" />
+                        <div class="form-text" id="manual-target-help">Optional daily target amount.</div>
                     </div>
                 </div>
-                @if (HasManualTargetRangeError)
-                {
-                    <div class="invalid-feedback d-block mt-2" id="manual-target-range-error" role="alert">
-                        @manualTargetRangeError
-                    </div>
-                }
                 <p class="form-text mb-3">
                     All load fields are optional. Leave a value blank and save to clear that existing manual value.
                 </p>
@@ -257,7 +212,7 @@
             <div class="alert alert-warning mt-3 mb-0" role="alert" id="manual-load-clear-confirmation">
                 <p class="mb-2">
                     Clear all saved manual Cardio Load and Target Load values for @manualLoadForm.MetricDate.ToString("MMMM d, yyyy")?
-                    Synced Google Health AZM values will not be changed.
+                    Other saved health metrics will not be changed.
                 </p>
                 <div class="d-flex flex-wrap gap-2">
                     <button class="btn btn-danger" type="button" @onclick="ClearManualLoadAsync" disabled="@isSavingManual">
@@ -285,10 +240,10 @@
 {
     <div class="card mb-4">
         <div class="card-header d-flex align-items-center justify-content-between gap-2 flex-wrap">
-            <span class="fw-semibold">@(chartMode == ChartMode.Load ? "Manual Cardio Load, Active Zone Minutes & training strain" : "Heart rate & HRV trend")</span>
+            <span class="fw-semibold">@(chartMode == ChartMode.Load ? "Manual Cardio Load & training strain" : "Heart rate & HRV trend")</span>
             <div class="btn-group btn-group-sm" role="group" aria-label="Chart metric">
                 <button type="button" class="btn @(chartMode == ChartMode.Heart ? "btn-primary" : "btn-outline-primary")" @onclick="@(() => SetChartModeAsync(ChartMode.Heart))" disabled="@(!HasHeartMetrics)">Heart &amp; HRV</button>
-                <button type="button" class="btn @(chartMode == ChartMode.Load ? "btn-primary" : "btn-outline-primary")" @onclick="@(() => SetChartModeAsync(ChartMode.Load))" disabled="@(!HasLoadMetrics)">Load &amp; AZM</button>
+                <button type="button" class="btn @(chartMode == ChartMode.Load ? "btn-primary" : "btn-outline-primary")" @onclick="@(() => SetChartModeAsync(ChartMode.Load))" disabled="@(!HasLoadMetrics)">Load</button>
             </div>
         </div>
         <div class="card-body py-2">
@@ -316,8 +271,6 @@
                 <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("cardioLoad"))">Manual Cardio Load @SortIndicator("cardioLoad")</button></th>
                 <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("targetLoad"))">Manual target @SortIndicator("targetLoad")</button></th>
                 <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("acwr"))">Manual ACWR @SortIndicator("acwr")</button></th>
-                <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("activeZoneMinutes"))">Active Zone Minutes (AZM) @SortIndicator("activeZoneMinutes")</button></th>
-                <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("activeZoneMinutesAcwr"))">AZM ACWR @SortIndicator("activeZoneMinutesAcwr")</button></th>
                 <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("sleepEfficiency"))">Sleep Efficiency (%) @SortIndicator("sleepEfficiency")</button></th>
                 <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("calories"))">Calories @SortIndicator("calories")</button></th>
                 <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("carbs"))">Carbs (g) @SortIndicator("carbs")</button></th>
@@ -329,7 +282,7 @@
             @if (metrics.Count == 0)
             {
                 <tr>
-                    <td colspan="15" class="text-center text-muted py-3">
+                    <td colspan="13" class="text-center text-muted py-3">
                         @(connectionStatus?.IsConnected == true
                             ? "No data for this range — run a sync first."
                             : "Connect Google Health and run sync to start tracking.")
@@ -347,10 +300,8 @@
                         <td>@Display(metric.DailyVo2MaxMlKgMin, "F1")</td>
                         <td>@Display(metric.RunVo2MaxMlKgMin)</td>
                         <td>@Display(metric.CardioLoad, "F1")</td>
-                        <td>@TargetLoadText(metric.TargetLoadMin, metric.TargetLoadMax)</td>
+                        <td>@TargetLoadText(metric.TargetLoad)</td>
                         <td>@Display(metric.Acwr, "F2")</td>
-                        <td>@Display(metric.ActiveZoneMinutes, "F1")</td>
-                        <td>@Display(metric.ActiveZoneMinutesAcwr, "F2")</td>
                         <td>@Display(metric.SleepEfficiency, "F2")</td>
                         <td>@Display(metric.ConsumedCaloriesKcal)</td>
                         <td>@Display(metric.CarbohydratesGrams, "F2")</td>
@@ -428,7 +379,6 @@
     private string? manualEntryMessage;
     private readonly ManualLoadForm manualLoadForm = new(DateOnly.FromDateTime(DateTime.UtcNow));
     private bool isConfirmingManualClear;
-    private string? manualTargetRangeError;
     private int selectedDays = 30;
     private bool chartNeedsRender;
     private ChartMode chartMode = ChartMode.Heart;
@@ -440,18 +390,8 @@
 
     private bool HasLoadMetrics =>
         metrics.Any(m => m.CardioLoad.HasValue
-            || m.TargetLoadMin.HasValue
-            || m.TargetLoadMax.HasValue
-            || m.ActiveZoneMinutes.HasValue
-            || m.Acwr.HasValue
-            || m.ActiveZoneMinutesAcwr.HasValue);
-
-    private bool HasManualTargetRangeError => !string.IsNullOrWhiteSpace(manualTargetRangeError);
-
-    private string ManualTargetInputDescription =>
-        HasManualTargetRangeError
-            ? "manual-target-help manual-target-range-error"
-            : "manual-target-help";
+            || m.TargetLoad.HasValue
+            || m.Acwr.HasValue);
 
     private IEnumerable<DailyMetricSnapshot> SortedMetrics =>
         sortColumn switch
@@ -461,10 +401,8 @@
             "dailyVo2" => Sort(metrics, metric => metric.DailyVo2MaxMlKgMin),
             "runVo2" => Sort(metrics, metric => metric.RunVo2MaxMlKgMin),
             "cardioLoad" => Sort(metrics, metric => metric.CardioLoad),
-            "targetLoad" => Sort(metrics, metric => metric.TargetLoadMin),
+            "targetLoad" => Sort(metrics, metric => metric.TargetLoad),
             "acwr" => Sort(metrics, metric => metric.Acwr),
-            "activeZoneMinutes" => Sort(metrics, metric => metric.ActiveZoneMinutes),
-            "activeZoneMinutesAcwr" => Sort(metrics, metric => metric.ActiveZoneMinutesAcwr),
             "sleepEfficiency" => Sort(metrics, metric => metric.SleepEfficiency),
             "calories" => Sort(metrics, metric => metric.ConsumedCaloriesKcal),
             "carbs" => Sort(metrics, metric => metric.CarbohydratesGrams),
@@ -495,21 +433,15 @@
             if (chartMode == ChartMode.Load)
             {
                 var cardioLoadData = ordered.Select(m => (object?)m.CardioLoad).ToArray();
-                var targetMinData = ordered.Select(m => (object?)m.TargetLoadMin).ToArray();
-                var targetMaxData = ordered.Select(m => (object?)m.TargetLoadMax).ToArray();
-                var activeZoneMinutesData = ordered.Select(m => (object?)m.ActiveZoneMinutes).ToArray();
+                var targetData = ordered.Select(m => (object?)m.TargetLoad).ToArray();
                 var manualAcwrData = ordered.Select(m => (object?)m.Acwr).ToArray();
-                var activeZoneMinutesAcwrData = ordered.Select(m => (object?)m.ActiveZoneMinutesAcwr).ToArray();
                 await JS.InvokeVoidAsync(
                     "HealthCharts.renderLoad",
                     "metricsChart",
                     labels,
                     cardioLoadData,
-                    targetMinData,
-                    targetMaxData,
-                    activeZoneMinutesData,
-                    manualAcwrData,
-                    activeZoneMinutesAcwrData);
+                    targetData,
+                    manualAcwrData);
             }
             else
             {
@@ -585,14 +517,6 @@
 
     private async Task SaveManualLoadAsync()
     {
-        ValidateManualTargetRange();
-        if (HasManualTargetRangeError)
-        {
-            manualEntryError = true;
-            manualEntryMessage = manualTargetRangeError;
-            return;
-        }
-
         try
         {
             isSavingManual = true;
@@ -601,12 +525,11 @@
                 new ManualLoadEntry(
                     manualLoadForm.MetricDate,
                     manualLoadForm.CardioLoad,
-                    manualLoadForm.TargetLoadMin,
-                    manualLoadForm.TargetLoadMax),
+                    manualLoadForm.TargetLoad),
                 _cts.Token);
             manualEntryError = !result.Succeeded;
             manualEntryMessage = result.Succeeded
-                ? "Manual Cardio Load saved. Synced AZM was not changed."
+                ? "Manual Cardio Load saved."
                 : result.ErrorMessage;
             if (result.Succeeded)
             {
@@ -632,10 +555,8 @@
     {
         var snapshot = metrics.SingleOrDefault(metric => metric.MetricDate == manualLoadForm.MetricDate);
         manualLoadForm.CardioLoad = snapshot?.CardioLoad;
-        manualLoadForm.TargetLoadMin = snapshot?.TargetLoadMin;
-        manualLoadForm.TargetLoadMax = snapshot?.TargetLoadMax;
+        manualLoadForm.TargetLoad = snapshot?.TargetLoad;
         isConfirmingManualClear = false;
-        ValidateManualTargetRange();
         manualEntryError = false;
         manualEntryMessage = "Unsaved changes were reset to the saved values for this date.";
     }
@@ -651,18 +572,8 @@
     private async Task ClearManualLoadAsync()
     {
         manualLoadForm.CardioLoad = null;
-        manualLoadForm.TargetLoadMin = null;
-        manualLoadForm.TargetLoadMax = null;
+        manualLoadForm.TargetLoad = null;
         await SaveManualLoadAsync();
-    }
-
-    private void ValidateManualTargetRange()
-    {
-        manualTargetRangeError = manualLoadForm.TargetLoadMin is not null
-            && manualLoadForm.TargetLoadMax is not null
-            && manualLoadForm.TargetLoadMin > manualLoadForm.TargetLoadMax
-                ? "Target minimum must be less than or equal to the target maximum."
-                : null;
     }
 
     private async Task DisconnectAsync()
@@ -711,17 +622,12 @@
         if (metricSummary?.LatestCardioLoad is null)
             return "—";
 
-        return $"{metricSummary.LatestCardioLoad.Value:F1} / Target: {TargetLoadText(metricSummary.LatestTargetLoadMin, metricSummary.LatestTargetLoadMax)}";
+        return $"{metricSummary.LatestCardioLoad.Value:F1} / Target: {TargetLoadText(metricSummary.LatestTargetLoad)}";
     }
 
-    private static string TargetLoadText(decimal? min, decimal? max)
+    private static string TargetLoadText(decimal? target)
     {
-        if (min is null && max is null)
-            return "—";
-
-        var minText = min?.ToString("F1", System.Globalization.CultureInfo.CurrentCulture) ?? "—";
-        var maxText = max?.ToString("F1", System.Globalization.CultureInfo.CurrentCulture) ?? "—";
-        return $"{minText}–{maxText}";
+        return target?.ToString("F1", System.Globalization.CultureInfo.CurrentCulture) ?? "—";
     }
 
     private void SortBy(string column)
@@ -811,7 +717,6 @@
     {
         public DateOnly MetricDate { get; set; } = metricDate;
         public decimal? CardioLoad { get; set; }
-        public decimal? TargetLoadMin { get; set; }
-        public decimal? TargetLoadMax { get; set; }
+        public decimal? TargetLoad { get; set; }
     }
 }

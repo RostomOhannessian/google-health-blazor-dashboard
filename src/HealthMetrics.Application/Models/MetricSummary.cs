@@ -10,13 +10,9 @@ public sealed record MetricSummary(
     double? AvgHrvRmssd7d,
     TrendDirection HrvTrend,
     decimal? LatestCardioLoad,
-    decimal? LatestTargetLoadMin,
-    decimal? LatestTargetLoadMax,
+    decimal? LatestTargetLoad,
     decimal? LatestAcwr,
-    AcwrStatus LatestAcwrStatus,
-    decimal? LatestActiveZoneMinutes,
-    decimal? LatestActiveZoneMinutesAcwr,
-    AcwrStatus LatestActiveZoneMinutesAcwrStatus)
+    AcwrStatus LatestAcwrStatus)
 {
     public static MetricSummary From(IReadOnlyList<DailyMetricSnapshot> snapshots)
     {
@@ -35,13 +31,9 @@ public sealed record MetricSummary(
                 ordered.Take(7).Select(s => (double?)s.HrvRmssdMilliseconds),
                 ordered.Skip(7).Take(7).Select(s => (double?)s.HrvRmssdMilliseconds)),
             LatestCardioLoad: latest?.CardioLoad,
-            LatestTargetLoadMin: latest?.TargetLoadMin,
-            LatestTargetLoadMax: latest?.TargetLoadMax,
+            LatestTargetLoad: latest?.TargetLoad,
             LatestAcwr: latest?.Acwr,
-            LatestAcwrStatus: AcwrCalculator.GetStatus(latest?.Acwr),
-            LatestActiveZoneMinutes: latest?.ActiveZoneMinutes,
-            LatestActiveZoneMinutesAcwr: latest?.ActiveZoneMinutesAcwr,
-            LatestActiveZoneMinutesAcwrStatus: AcwrCalculator.GetStatus(latest?.ActiveZoneMinutesAcwr));
+            LatestAcwrStatus: AcwrCalculator.GetStatus(latest?.Acwr));
     }
 
     private static double? Avg(IEnumerable<double?> values)

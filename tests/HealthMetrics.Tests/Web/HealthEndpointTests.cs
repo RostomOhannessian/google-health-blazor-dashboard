@@ -73,7 +73,7 @@ public sealed class HealthEndpointTests
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("text/csv", response.Content.Headers.ContentType!.MediaType);
-        Assert.StartsWith("Date,RestingHR_bpm,HRV_RMSSD_ms,DailyVO2Max_ml_kg_min,RunVO2Max_ml_kg_min,ManualCardioLoad,ManualTargetLoadMin,ManualTargetLoadMax,ManualACWR,ActiveZoneMinutes,ActiveZoneMinutesACWR,SleepEfficiency_pct,DeepSleep_min,RemSleep_min,Calories_kcal,Carbs_g,Fat_g,Protein_g", csv);
+        Assert.StartsWith("Date,RestingHR_bpm,HRV_RMSSD_ms,DailyVO2Max_ml_kg_min,RunVO2Max_ml_kg_min,ManualCardioLoad,ManualTargetLoad,ManualACWR,SleepEfficiency_pct,DeepSleep_min,RemSleep_min,Calories_kcal,Carbs_g,Fat_g,Protein_g", csv);
         Assert.DoesNotContain("Sodium", csv);
         Assert.DoesNotContain("Fiber", csv);
     }
@@ -82,7 +82,7 @@ public sealed class HealthEndpointTests
     public async Task MetricsExport_UsesInvariantCultureForDecimals()
     {
         // The fake metric query returns rows with decimal fields (HRV 42.5, Carbs 260.5 etc.).
-        // Each data row must have exactly 16 comma-separated columns regardless of the host
+        // Each data row must have exactly 15 comma-separated columns regardless of the host
         // locale. A comma-decimal locale would produce extra columns if formatting were
         // culture-dependent.
         await using var factory = new HealthMetricsWebApplicationFactory();
@@ -94,7 +94,7 @@ public sealed class HealthEndpointTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var lines = csv.Split('\n', StringSplitOptions.RemoveEmptyEntries);
         foreach (var line in lines.Skip(1)) // skip header
-            Assert.Equal(18, line.TrimEnd('\r').Split(',').Length);
+            Assert.Equal(15, line.TrimEnd('\r').Split(',').Length);
 
         Assert.Contains("42.5", csv);
         Assert.Contains("260.5", csv);
@@ -150,16 +150,13 @@ public sealed class HealthEndpointTests
         Assert.Contains("260.50", html);
         Assert.Contains("70.00", html);
         Assert.Contains("120.00", html);
-        Assert.Contains("78.0 / Target:", html);
-        Assert.Contains("60.0", html);
-        Assert.Contains("90.0", html);
+        Assert.Contains("78.0 / Target: 75.0", html);
         Assert.Contains("1.05", html);
         Assert.Contains("Optimal Zone", html);
         Assert.Contains("Manual Cardio Load and Target Load", html);
         Assert.Contains("Manual Cardio Load", html);
-        Assert.Contains("Active Zone Minutes (AZM)", html);
+        Assert.Contains("Target (load points)", html);
         Assert.Contains("Manual target", html);
-        Assert.Contains("AZM ACWR", html);
         Assert.Contains("Sleep Efficiency (%)", html);
     }
 
@@ -175,16 +172,13 @@ public sealed class HealthEndpointTests
         Assert.Contains("<fieldset", html);
         Assert.Contains("Manual load entry", html);
         Assert.Contains("Cardio Load (load points)", html);
-        Assert.Contains("Target minimum (load points)", html);
-        Assert.Contains("Target maximum (load points)", html);
+        Assert.Contains("Target (load points)", html);
         Assert.Contains("min=\"0\"", html);
         Assert.Contains("step=\"0.1\"", html);
         Assert.Contains("inputmode=\"decimal\"", html);
         Assert.Contains("manual-target-help", html);
         Assert.Contains("Clear saved values", html);
         Assert.Contains("They drive the Manual Cardio ACWR calculation only", html);
-        Assert.Contains("never overwrite Google Health Active Zone Minutes (AZM) or AZM ACWR", html);
-        Assert.Contains("Synced provider metric from Google Health", html);
     }
 
     [Fact]
@@ -209,10 +203,8 @@ public sealed class HealthEndpointTests
         var script = await client.GetStringAsync("/charts.js");
 
         Assert.Contains("Manual Cardio Load", script);
-        Assert.Contains("Active Zone Minutes (AZM)", script);
-        Assert.Contains("Manual target range", script);
+        Assert.Contains("Manual target", script);
         Assert.Contains("Manual ACWR", script);
-        Assert.Contains("AZM ACWR", script);
         Assert.Contains("yAcwr", script);
     }
 
@@ -360,11 +352,8 @@ public sealed class HealthEndpointTests
                     DailyVo2MaxMlKgMin = 46.8m,
                     RunVo2MaxMlKgMin = 47.2m,
                     CardioLoad = 78m,
-                    TargetLoadMin = 60m,
-                    TargetLoadMax = 90m,
+                    TargetLoad = 75m,
                     Acwr = 1.05m,
-                    ActiveZoneMinutes = 82m,
-                    ActiveZoneMinutesAcwr = 1.08m,
                     SleepEfficiency = 91m,
                     DeepSleepMinutes = 85,
                     RemSleepMinutes = 105,

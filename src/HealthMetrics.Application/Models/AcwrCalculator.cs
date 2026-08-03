@@ -25,17 +25,6 @@ public static class AcwrCalculator
             snapshot.Acwr = Calculate(cardioLoads, snapshot.MetricDate);
     }
 
-    public static void RecalculateActiveZoneMinutes(IEnumerable<DailyMetricSnapshot> snapshots)
-    {
-        var snapshotList = snapshots.ToList();
-        var activeZoneMinutes = snapshotList
-            .GroupBy(snapshot => snapshot.MetricDate)
-            .ToDictionary(group => group.Key, group => group.Last().ActiveZoneMinutes);
-
-        foreach (var snapshot in snapshotList)
-            snapshot.ActiveZoneMinutesAcwr = Calculate(activeZoneMinutes, snapshot.MetricDate);
-    }
-
     public static decimal? Calculate(
         IReadOnlyDictionary<DateOnly, decimal?> cardioLoads,
         DateOnly date)

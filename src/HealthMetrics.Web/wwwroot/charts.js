@@ -127,7 +127,7 @@ window.HealthCharts = (function () {
             });
         },
 
-        renderLoad(canvasId, labels, cardioLoadData, targetMinData, targetMaxData, activeZoneMinutesData, manualAcwrData, activeZoneMinutesAcwrData) {
+        renderLoad(canvasId, labels, cardioLoadData, targetData, manualAcwrData) {
             if (charts[canvasId]) {
                 charts[canvasId].destroy();
             }
@@ -135,35 +135,19 @@ window.HealthCharts = (function () {
             if (!canvas) return;
 
             const hasCardioLoad = cardioLoadData.some(v => v !== null);
-            const hasActiveZoneMinutes = activeZoneMinutesData.some(v => v !== null);
-            const hasTargetRange = targetMinData.some(v => v !== null) || targetMaxData.some(v => v !== null);
+            const hasTarget = targetData.some(v => v !== null);
             const hasManualAcwr = manualAcwrData.some(v => v !== null);
-            const hasActiveZoneMinutesAcwr = activeZoneMinutesAcwrData.some(v => v !== null);
             const colors = themeColors();
             const datasets = [];
 
-            if (hasTargetRange) {
+            if (hasTarget) {
                 datasets.push({
-                    label: "Manual target min",
-                    data: targetMinData,
-                    type: "line",
-                    borderColor: "rgba(25, 135, 84, 0)",
-                    backgroundColor: "rgba(25, 135, 84, 0)",
-                    pointRadius: 0,
-                    borderWidth: 0,
-                    fill: false,
-                    spanGaps: true,
-                    yAxisID: "yLoad"
-                });
-                datasets.push({
-                    label: "Manual target range",
-                    data: targetMaxData,
+                    label: "Manual target",
+                    data: targetData,
                     type: "line",
                     borderColor: "rgba(25, 135, 84, 0.7)",
-                    backgroundColor: "rgba(25, 135, 84, 0.16)",
-                    pointRadius: 0,
                     borderWidth: 1,
-                    fill: "-1",
+                    pointRadius: 2,
                     spanGaps: true,
                     yAxisID: "yLoad"
                 });
@@ -176,18 +160,6 @@ window.HealthCharts = (function () {
                     type: "bar",
                     backgroundColor: "rgba(111, 66, 193, 0.62)",
                     borderColor: "rgb(111, 66, 193)",
-                    borderWidth: 1,
-                    yAxisID: "yLoad"
-                });
-            }
-
-            if (hasActiveZoneMinutes) {
-                datasets.push({
-                    label: "Active Zone Minutes (AZM)",
-                    data: activeZoneMinutesData,
-                    type: "bar",
-                    backgroundColor: "rgba(13, 110, 253, 0.62)",
-                    borderColor: "rgb(13, 110, 253)",
                     borderWidth: 1,
                     yAxisID: "yLoad"
                 });
@@ -206,19 +178,6 @@ window.HealthCharts = (function () {
                 });
             }
 
-            if (hasActiveZoneMinutesAcwr) {
-                datasets.push({
-                    label: "AZM ACWR",
-                    data: activeZoneMinutesAcwrData,
-                    type: "line",
-                    borderColor: "rgb(25, 135, 84)",
-                    backgroundColor: "rgba(25, 135, 84, 0.08)",
-                    tension: 0.3,
-                    spanGaps: true,
-                    yAxisID: "yAcwr"
-                });
-            }
-
             charts[canvasId] = new Chart(canvas, {
                 type: "bar",
                 data: { labels, datasets },
@@ -229,8 +188,7 @@ window.HealthCharts = (function () {
                         legend: {
                             position: "top",
                             labels: {
-                                color: colors.text,
-                                filter: item => item.text !== "Manual target min"
+                                color: colors.text
                             }
                         },
                         tooltip: {
@@ -252,7 +210,7 @@ window.HealthCharts = (function () {
                             type: "linear",
                             position: "left",
                             beginAtZero: true,
-                            title: { display: true, text: "Load / Active Zone Minutes", color: colors.muted },
+                            title: { display: true, text: "Load", color: colors.muted },
                             ticks: { color: colors.muted },
                             grid: { color: colors.grid },
                             border: { color: colors.grid }

@@ -87,15 +87,6 @@ internal sealed class GoogleHealthApiClient(
                 "rmssd"),
             cancellationToken);
 
-        await MergeDailyRollupAsync(
-            snapshots,
-            "active-zone-minutes",
-            startDate,
-            endDate,
-            accessToken,
-            ApplyActiveZoneMinutes,
-            cancellationToken);
-
         if (includeSleep)
             await MergeSleepAsync(snapshots, startDate, endDate, accessToken, cancellationToken);
 
@@ -305,21 +296,6 @@ internal sealed class GoogleHealthApiClient(
             ? candidate.IsMainSleep
             : candidate.DurationMinutes > current.DurationMinutes;
 
-    private static void ApplyActiveZoneMinutes(DailyMetricSnapshot snapshot, JsonElement point)
-    {
-        var activeZoneMinutes = FindObject(point, "activeZoneMinutes");
-        if (activeZoneMinutes is null)
-            return;
-
-        var fatBurn = ReadDecimal(activeZoneMinutes.Value, "sumInFatBurnHeartZone");
-        var cardio = ReadDecimal(activeZoneMinutes.Value, "sumInCardioHeartZone");
-        var peak = ReadDecimal(activeZoneMinutes.Value, "sumInPeakHeartZone");
-        if (fatBurn is null || cardio is null || peak is null)
-            return;
-
-        snapshot.ActiveZoneMinutes = fatBurn.Value + cardio.Value + peak.Value;
-    }
-
     private static void ApplyNutrition(DailyMetricSnapshot snapshot, JsonElement point)
     {
         snapshot.ConsumedCaloriesKcal = ReadInt(point, "kcalSum", "kilocaloriesSum", "caloriesKcal");
@@ -519,7 +495,6 @@ internal sealed class GoogleHealthApiClient(
         || snapshot.HrvRmssdMilliseconds is not null
         || snapshot.DailyVo2MaxMlKgMin is not null
         || snapshot.RunVo2MaxMlKgMin is not null
-        || snapshot.ActiveZoneMinutes is not null
         || snapshot.SleepEfficiency is not null
         || snapshot.DeepSleepMinutes is not null
         || snapshot.RemSleepMinutes is not null

@@ -18,15 +18,9 @@ public sealed class DailyMetricSnapshot
 
     public decimal? CardioLoad { get; set; }
 
-    public decimal? TargetLoadMin { get; set; }
-
-    public decimal? TargetLoadMax { get; set; }
+    public decimal? TargetLoad { get; set; }
 
     public decimal? Acwr { get; set; }
-
-    public decimal? ActiveZoneMinutes { get; set; }
-
-    public decimal? ActiveZoneMinutesAcwr { get; set; }
 
     public decimal? SleepEfficiency { get; set; }
 

@@ -144,7 +144,7 @@ public sealed class HealthMetricsDbContextTests
     }
 
     [Fact]
-    public async Task SeparateManualLoadAndAzmMigration_CopiesProviderLoadAndClearsRetiredAutomaticFields()
+    public async Task RemoveAzmAndSimplifyManualTargetMigration_AveragesSavedTargetsAndDropsRetiredFields()
     {
         await using var connection = new SqliteConnection("Data Source=:memory:");
         await connection.OpenAsync();
@@ -155,12 +155,14 @@ public sealed class HealthMetricsDbContextTests
         await using (var legacyContext = new HealthMetricsDbContext(options))
         {
             var migrator = legacyContext.GetService<IMigrator>();
-            await migrator.MigrateAsync("20260803035901_AddCardioLoadAndSleepMetrics");
+            await migrator.MigrateAsync("20260803053050_SeparateManualLoadAndAzm");
             await legacyContext.Database.ExecuteSqlRawAsync("""
                 INSERT INTO daily_metric_snapshots (
-                    UserKey, MetricDate, CardioLoad, TargetLoadMin, TargetLoadMax, Acwr, CapturedAtUtc
+                    UserKey, MetricDate, CardioLoad, TargetLoadMin, TargetLoadMax, Acwr,
+                    ActiveZoneMinutes, ActiveZoneMinutesAcwr, CapturedAtUtc
                 ) VALUES (
-                    'local-user', '2026-08-02', 82.0, 60.0, 90.0, 1.05, '2026-08-03T00:00:00+00:00'
+                    'local-user', '2026-08-02', 82.0, 60.0, 90.0, 1.05,
+                    82.0, 1.05, '2026-08-03T00:00:00+00:00'
                 );
                 """);
             await migrator.MigrateAsync();
@@ -168,12 +170,14 @@ public sealed class HealthMetricsDbContextTests
 
         await using var migratedContext = new HealthMetricsDbContext(options);
         var snapshot = await migratedContext.DailyMetricSnapshots.SingleAsync();
-        Assert.Equal(82m, snapshot.ActiveZoneMinutes);
-        Assert.Equal(1.05m, snapshot.ActiveZoneMinutesAcwr);
-        Assert.Null(snapshot.CardioLoad);
-        Assert.Null(snapshot.TargetLoadMin);
-        Assert.Null(snapshot.TargetLoadMax);
-        Assert.Null(snapshot.Acwr);
+        Assert.Equal(82m, snapshot.CardioLoad);
+        Assert.Equal(75m, snapshot.TargetLoad);
+        Assert.Equal(1.05m, snapshot.Acwr);
+        Assert.Equal(1, await ScalarAsync<long>(connection, "SELECT COUNT(*) FROM pragma_table_info('daily_metric_snapshots') WHERE name = 'TargetLoad'"));
+        Assert.Equal(0, await ScalarAsync<long>(connection, "SELECT COUNT(*) FROM pragma_table_info('daily_metric_snapshots') WHERE name = 'TargetLoadMin'"));
+        Assert.Equal(0, await ScalarAsync<long>(connection, "SELECT COUNT(*) FROM pragma_table_info('daily_metric_snapshots') WHERE name = 'TargetLoadMax'"));
+        Assert.Equal(0, await ScalarAsync<long>(connection, "SELECT COUNT(*) FROM pragma_table_info('daily_metric_snapshots') WHERE name = 'ActiveZoneMinutes'"));
+        Assert.Equal(0, await ScalarAsync<long>(connection, "SELECT COUNT(*) FROM pragma_table_info('daily_metric_snapshots') WHERE name = 'ActiveZoneMinutesAcwr'"));
     }
 
     private static string LegacyConnectionTable => "fit" + "bit_connections";

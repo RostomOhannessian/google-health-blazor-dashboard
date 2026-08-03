@@ -33,23 +33,18 @@ public sealed class ManualLoadEntryServiceTests : IAsyncLifetime
         dbContext.DailyMetricSnapshots.Add(new DailyMetricSnapshot
         {
             MetricDate = date,
-            RestingHeartRateBpm = 58,
-            ActiveZoneMinutes = 82m,
-            ActiveZoneMinutesAcwr = 1.08m
+            RestingHeartRateBpm = 58
         });
         await dbContext.SaveChangesAsync();
 
         var result = await new ManualLoadEntryService(dbContext).SaveAsync(
-            new ManualLoadEntry(date, 78m, 60m, 90m));
+            new ManualLoadEntry(date, 78m, 75m));
 
         var stored = await dbContext.DailyMetricSnapshots.SingleAsync();
         Assert.True(result.Succeeded);
         Assert.Equal(78m, stored.CardioLoad);
-        Assert.Equal(60m, stored.TargetLoadMin);
-        Assert.Equal(90m, stored.TargetLoadMax);
+        Assert.Equal(75m, stored.TargetLoad);
         Assert.Equal(58, stored.RestingHeartRateBpm);
-        Assert.Equal(82m, stored.ActiveZoneMinutes);
-        Assert.Equal(1.08m, stored.ActiveZoneMinutesAcwr);
     }
 
     [Fact]
@@ -60,21 +55,17 @@ public sealed class ManualLoadEntryServiceTests : IAsyncLifetime
         {
             MetricDate = date,
             CardioLoad = 78m,
-            TargetLoadMin = 60m,
-            TargetLoadMax = 90m,
-            ActiveZoneMinutes = 82m
+            TargetLoad = 75m
         });
         await dbContext.SaveChangesAsync();
 
         var result = await new ManualLoadEntryService(dbContext).SaveAsync(
-            new ManualLoadEntry(date, null, null, null));
+            new ManualLoadEntry(date, null, null));
 
         var stored = await dbContext.DailyMetricSnapshots.SingleAsync();
         Assert.True(result.Succeeded);
         Assert.Null(stored.CardioLoad);
-        Assert.Null(stored.TargetLoadMin);
-        Assert.Null(stored.TargetLoadMax);
-        Assert.Equal(82m, stored.ActiveZoneMinutes);
+        Assert.Null(stored.TargetLoad);
     }
 
     [Fact]
@@ -85,42 +76,32 @@ public sealed class ManualLoadEntryServiceTests : IAsyncLifetime
         {
             MetricDate = date,
             CardioLoad = 78m,
-            TargetLoadMin = 60m,
-            TargetLoadMax = 90m,
-            ActiveZoneMinutes = 82m,
-            ActiveZoneMinutesAcwr = 1.08m
+            TargetLoad = 75m
         });
         await dbContext.SaveChangesAsync();
 
         var result = await new ManualLoadEntryService(dbContext).SaveAsync(
-            new ManualLoadEntry(date, null, 65m, 95m));
+            new ManualLoadEntry(date, null, 80m));
 
         var stored = await dbContext.DailyMetricSnapshots.SingleAsync();
         Assert.True(result.Succeeded);
         Assert.Null(stored.CardioLoad);
-        Assert.Equal(65m, stored.TargetLoadMin);
-        Assert.Equal(95m, stored.TargetLoadMax);
-        Assert.Equal(82m, stored.ActiveZoneMinutes);
-        Assert.Equal(1.08m, stored.ActiveZoneMinutesAcwr);
+        Assert.Equal(80m, stored.TargetLoad);
     }
 
     [Theory]
-    [InlineData(-1d, null, null, "Manual Cardio Load cannot be negative.")]
-    [InlineData(null, -1d, null, "Manual target minimum cannot be negative.")]
-    [InlineData(null, null, -1d, "Manual target maximum cannot be negative.")]
-    [InlineData(null, 91d, 90d, "Manual target minimum cannot exceed the maximum.")]
+    [InlineData(-1d, null, "Manual Cardio Load cannot be negative.")]
+    [InlineData(null, -1d, "Manual target cannot be negative.")]
     public async Task SaveAsync_RejectsInvalidManualValues(
         double? cardioLoad,
-        double? targetMin,
-        double? targetMax,
+        double? targetLoad,
         string expectedError)
     {
         var result = await new ManualLoadEntryService(dbContext).SaveAsync(
             new ManualLoadEntry(
                 new DateOnly(2026, 8, 2),
                 (decimal?)cardioLoad,
-                (decimal?)targetMin,
-                (decimal?)targetMax));
+                (decimal?)targetLoad));
 
         Assert.False(result.Succeeded);
         Assert.Equal(expectedError, result.ErrorMessage);

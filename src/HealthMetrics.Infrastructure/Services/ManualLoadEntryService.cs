@@ -30,8 +30,7 @@ internal sealed class ManualLoadEntryService(HealthMetricsDbContext dbContext) :
         }
 
         snapshot.CardioLoad = entry.CardioLoad;
-        snapshot.TargetLoadMin = entry.TargetLoadMin;
-        snapshot.TargetLoadMax = entry.TargetLoadMax;
+        snapshot.TargetLoad = entry.TargetLoad;
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
@@ -49,16 +48,8 @@ internal sealed class ManualLoadEntryService(HealthMetricsDbContext dbContext) :
     {
         if (entry.CardioLoad is < 0)
             return "Manual Cardio Load cannot be negative.";
-        if (entry.TargetLoadMin is < 0)
-            return "Manual target minimum cannot be negative.";
-        if (entry.TargetLoadMax is < 0)
-            return "Manual target maximum cannot be negative.";
-        if (entry.TargetLoadMin is not null
-            && entry.TargetLoadMax is not null
-            && entry.TargetLoadMin > entry.TargetLoadMax)
-        {
-            return "Manual target minimum cannot exceed the maximum.";
-        }
+        if (entry.TargetLoad is < 0)
+            return "Manual target cannot be negative.";
 
         return null;
     }

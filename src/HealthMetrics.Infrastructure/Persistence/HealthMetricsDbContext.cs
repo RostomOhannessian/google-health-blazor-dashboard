@@ -36,11 +36,8 @@ public sealed class HealthMetricsDbContext(DbContextOptions<HealthMetricsDbConte
             entity.Property(snapshot => snapshot.DailyVo2MaxMlKgMin).HasPrecision(9, 2);
             entity.Property(snapshot => snapshot.RunVo2MaxMlKgMin).HasPrecision(9, 2);
             entity.Property(snapshot => snapshot.CardioLoad).HasPrecision(9, 2);
-            entity.Property(snapshot => snapshot.TargetLoadMin).HasPrecision(9, 2);
-            entity.Property(snapshot => snapshot.TargetLoadMax).HasPrecision(9, 2);
+            entity.Property(snapshot => snapshot.TargetLoad).HasPrecision(9, 2);
             entity.Property(snapshot => snapshot.Acwr).HasPrecision(9, 2);
-            entity.Property(snapshot => snapshot.ActiveZoneMinutes).HasPrecision(9, 2);
-            entity.Property(snapshot => snapshot.ActiveZoneMinutesAcwr).HasPrecision(9, 2);
             entity.Property(snapshot => snapshot.SleepEfficiency).HasPrecision(9, 2);
             entity.Property(snapshot => snapshot.CarbohydratesGrams).HasPrecision(9, 2);
             entity.Property(snapshot => snapshot.FatGrams).HasPrecision(9, 2);

@@ -30,9 +30,9 @@ HealthMetrics.Tests
 
 1. `GoogleHealthSyncService` asks `IHealthAuthorizationService` for a valid access token.
 2. `GoogleHealthApiClient` fetches the selected date range by Google data type.
-3. The client maps documented Active Zone Minutes daily rollups and selects one sleep
-   session per civil end date, preferring provider-marked main sleep and then
-   longest duration.
+3. The client maps documented Google Health metrics and selects one sleep session
+   per civil end date, preferring provider-marked main sleep and then longest
+   duration.
 4. Before requesting sleep, the service checks the persisted OAuth grant. Older
    connections without `googlehealth.sleep.readonly` skip only sleep, continue
    syncing already-authorized metrics, and expose reconnect guidance through
@@ -40,11 +40,9 @@ HealthMetrics.Tests
 5. The service merges results into `daily_metric_snapshots` using
    `(UserKey, MetricDate)` idempotency and never replaces an existing provider
    value with a null from a partial response.
-6. After the merge is saved, `AcwrCalculator` recalculates both persisted ratios
-   independently: `Acwr` from manual `CardioLoad` and `ActiveZoneMinutesAcwr`
-   from synced `ActiveZoneMinutes`. A ratio clears when its own complete 7/28-day
-   windows are unavailable. Sync never changes the manual Cardio Load or target
-   fields.
+6. After the merge is saved, `AcwrCalculator` recalculates the persisted manual
+   ratio from `CardioLoad`. The ratio clears when its complete 7/28-day window is
+   unavailable. Sync never changes the manual Cardio Load or target fields.
 7. `sync_history` records requested days, persisted days, duration, outcome, and
    sanitized errors.
 
@@ -52,10 +50,10 @@ HealthMetrics.Tests
 
 `MetricQueryService` returns local snapshots to the interactive Home component.
 `ManualLoadEntryService` validates nullable user-entered manual Cardio Load and
-targets, preserves synced fields, and recalculates only the manual ratio. The
-table exposes separate manual and AZM values and ratios with `—` fallbacks.
-Chart.js keeps Heart & HRV separate from the load view, which uses manual bars
-and a manual target band, AZM bars, and both ratios on the right axis.
+target amount, preserves synced fields, and recalculates only the manual ratio.
+The table exposes manual values and the ratio with `—` fallbacks. Chart.js keeps
+Heart & HRV separate from the load view, which uses manual bars, a manual target
+line, and the manual ratio on the right axis.
 The CSV endpoint exports the persisted source and derived values, including
 deep/REM minutes, with invariant-culture numeric formatting.
 

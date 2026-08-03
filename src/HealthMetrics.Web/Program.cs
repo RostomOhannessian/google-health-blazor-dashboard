@@ -169,11 +169,11 @@ try
         var metrics = await metricQueryService.GetRecentMetricsAsync(requestedDays, cancellationToken);
 
         var sb = new StringBuilder();
-        sb.AppendLine("Date,RestingHR_bpm,HRV_RMSSD_ms,DailyVO2Max_ml_kg_min,RunVO2Max_ml_kg_min,ManualCardioLoad,ManualTargetLoadMin,ManualTargetLoadMax,ManualACWR,ActiveZoneMinutes,ActiveZoneMinutesACWR,SleepEfficiency_pct,DeepSleep_min,RemSleep_min,Calories_kcal,Carbs_g,Fat_g,Protein_g");
+        sb.AppendLine("Date,RestingHR_bpm,HRV_RMSSD_ms,DailyVO2Max_ml_kg_min,RunVO2Max_ml_kg_min,ManualCardioLoad,ManualTargetLoad,ManualACWR,SleepEfficiency_pct,DeepSleep_min,RemSleep_min,Calories_kcal,Carbs_g,Fat_g,Protein_g");
         foreach (var m in metrics.OrderBy(m => m.MetricDate))
         {
             sb.AppendLine(string.Create(CultureInfo.InvariantCulture,
-                $"{m.MetricDate:yyyy-MM-dd},{m.RestingHeartRateBpm},{m.HrvRmssdMilliseconds},{m.DailyVo2MaxMlKgMin},{m.RunVo2MaxMlKgMin},{m.CardioLoad},{m.TargetLoadMin},{m.TargetLoadMax},{m.Acwr},{m.ActiveZoneMinutes},{m.ActiveZoneMinutesAcwr},{m.SleepEfficiency},{m.DeepSleepMinutes},{m.RemSleepMinutes},{m.ConsumedCaloriesKcal},{m.CarbohydratesGrams},{m.FatGrams},{m.ProteinGrams}"));
+                $"{m.MetricDate:yyyy-MM-dd},{m.RestingHeartRateBpm},{m.HrvRmssdMilliseconds},{m.DailyVo2MaxMlKgMin},{m.RunVo2MaxMlKgMin},{m.CardioLoad},{m.TargetLoad},{m.Acwr},{m.SleepEfficiency},{m.DeepSleepMinutes},{m.RemSleepMinutes},{m.ConsumedCaloriesKcal},{m.CarbohydratesGrams},{m.FatGrams},{m.ProteinGrams}"));
         }
 
         var filename = $"health-metrics-{DateOnly.FromDateTime(DateTime.UtcNow):yyyy-MM-dd}.csv";

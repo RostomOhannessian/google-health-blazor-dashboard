@@ -75,24 +75,4 @@ public sealed class AcwrCalculatorTests
         Assert.All(snapshots, snapshot => Assert.Null(snapshot.Acwr));
     }
 
-    [Fact]
-    public void Recalculate_KeepsManualAndActiveZoneMinutesSeriesIndependent()
-    {
-        var endDate = new DateOnly(2026, 1, 28);
-        var snapshots = Enumerable.Range(0, 28)
-            .Select(offset => new DailyMetricSnapshot
-            {
-                MetricDate = endDate.AddDays(-offset),
-                CardioLoad = 100m,
-                ActiveZoneMinutes = offset < 7 ? 202m : 200m
-            })
-            .ToList();
-
-        AcwrCalculator.RecalculateManualCardioLoad(snapshots);
-        AcwrCalculator.RecalculateActiveZoneMinutes(snapshots);
-
-        var latest = snapshots.Single(snapshot => snapshot.MetricDate == endDate);
-        Assert.Equal(1m, latest.Acwr);
-        Assert.Equal(1.01m, latest.ActiveZoneMinutesAcwr);
-    }
 }

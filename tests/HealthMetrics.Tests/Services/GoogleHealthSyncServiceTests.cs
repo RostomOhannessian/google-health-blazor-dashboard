@@ -60,8 +60,7 @@ public sealed class GoogleHealthSyncServiceTests : IAsyncLifetime
             DailyVo2MaxMlKgMin = 46.0m,
             RunVo2MaxMlKgMin = 47.0m,
             CardioLoad = 78m,
-            TargetLoadMin = 60m,
-            TargetLoadMax = 90m,
+            TargetLoad = 60m,
             SleepEfficiency = 91m,
             DeepSleepMinutes = 85,
             RemSleepMinutes = 105,
@@ -103,9 +102,7 @@ public sealed class GoogleHealthSyncServiceTests : IAsyncLifetime
         Assert.Equal(46.0m, stored.DailyVo2MaxMlKgMin);
         Assert.Equal(47.0m, stored.RunVo2MaxMlKgMin);
         Assert.Equal(78m, stored.CardioLoad);
-        Assert.Equal(60m, stored.TargetLoadMin);
-        Assert.Equal(90m, stored.TargetLoadMax);
-        Assert.Null(stored.ActiveZoneMinutes);
+        Assert.Equal(60m, stored.TargetLoad);
         Assert.Equal(91m, stored.SleepEfficiency);
         Assert.Equal(85, stored.DeepSleepMinutes);
         Assert.Equal(105, stored.RemSleepMinutes);
@@ -152,38 +149,21 @@ public sealed class GoogleHealthSyncServiceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task SyncRecentDaysAsync_Merge_StoresActiveZoneMinutesAndPreservesManualLoad()
+    public async Task SyncRecentDaysAsync_Merge_PreservesManualLoadAndStoresSleep()
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         _dbContext.DailyMetricSnapshots.Add(new DailyMetricSnapshot
         {
             MetricDate = today,
             CardioLoad = 78m,
-            TargetLoadMin = 60m,
-            TargetLoadMax = 90m,
+            TargetLoad = 75m,
             Acwr = 1.05m,
-            ActiveZoneMinutes = 70m
         });
         await _dbContext.SaveChangesAsync();
 
         var handler = new StubHandler(req =>
         {
             var path = req.RequestUri!.ToString();
-            if (path.Contains("active-zone-minutes"))
-                return Json($$$"""
-                    {
-                      "dailyRollupDataPoints": [
-                        {
-                          "civilStartTime": {"date": {"year":{{{today.Year}}},"month":{{{today.Month}}},"day":{{{today.Day}}}}},
-                          "activeZoneMinutes": {
-                            "sumInFatBurnHeartZone": 12,
-                            "sumInCardioHeartZone": 40,
-                            "sumInPeakHeartZone": 30
-                          }
-                        }
-                      ]
-                    }
-                    """);
             if (path.Contains("dataTypes/sleep/dataPoints"))
                 return Json($$$"""
                     {
@@ -222,44 +202,26 @@ public sealed class GoogleHealthSyncServiceTests : IAsyncLifetime
 
         var stored = await _dbContext.DailyMetricSnapshots.SingleAsync();
         Assert.Equal(78m, stored.CardioLoad);
-        Assert.Equal(82m, stored.ActiveZoneMinutes);
-        Assert.Equal(60m, stored.TargetLoadMin);
-        Assert.Equal(90m, stored.TargetLoadMax);
+        Assert.Equal(75m, stored.TargetLoad);
         Assert.Equal(88m, stored.SleepEfficiency);
         Assert.Equal(70, stored.DeepSleepMinutes);
         Assert.Equal(100, stored.RemSleepMinutes);
     }
 
     [Fact]
-    public async Task SyncRecentDaysAsync_RecalculatesIndependentAcwrSeriesFromPersistedHistory()
+    public async Task SyncRecentDaysAsync_RecalculatesManualAcwrFromPersistedHistory()
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         _dbContext.DailyMetricSnapshots.AddRange(
             Enumerable.Range(0, 28).Select(offset => new DailyMetricSnapshot
             {
                 MetricDate = today.AddDays(-offset),
-                CardioLoad = 100m,
-                ActiveZoneMinutes = 100m
+                CardioLoad = 100m
             }));
         await _dbContext.SaveChangesAsync();
 
         var handler = new StubHandler(req =>
         {
-            if (req.RequestUri!.ToString().Contains("active-zone-minutes"))
-                return Json($$$"""
-                    {
-                      "dailyRollupDataPoints": [
-                        {
-                          "civilStartTime": {"date": {"year":{{{today.Year}}},"month":{{{today.Month}}},"day":{{{today.Day}}}}},
-                          "activeZoneMinutes": {
-                            "sumInFatBurnHeartZone": 30,
-                            "sumInCardioHeartZone": 40,
-                            "sumInPeakHeartZone": 40
-                          }
-                        }
-                      ]
-                    }
-                    """);
             return Json("""{}""");
         });
 
@@ -268,16 +230,10 @@ public sealed class GoogleHealthSyncServiceTests : IAsyncLifetime
         var stored = await _dbContext.DailyMetricSnapshots
             .SingleAsync(snapshot => snapshot.MetricDate == today);
         Assert.Equal(1m, stored.Acwr);
-        Assert.Equal(1.01m, stored.ActiveZoneMinutesAcwr);
-        Assert.Null(stored.TargetLoadMin);
-        Assert.Null(stored.TargetLoadMax);
+        Assert.Null(stored.TargetLoad);
         Assert.All(
             await _dbContext.DailyMetricSnapshots.Where(snapshot => snapshot.MetricDate < today).ToListAsync(),
-            snapshot =>
-            {
-                Assert.Null(snapshot.Acwr);
-                Assert.Null(snapshot.ActiveZoneMinutesAcwr);
-            });
+            snapshot => Assert.Null(snapshot.Acwr));
     }
 
     [Fact]

@@ -165,15 +165,13 @@ public sealed class MetricSummaryTests
     {
         var snapshot = Snapshot(new DateOnly(2025, 1, 1));
         snapshot.CardioLoad = 78m;
-        snapshot.TargetLoadMin = 60m;
-        snapshot.TargetLoadMax = 90m;
+        snapshot.TargetLoad = 75m;
         snapshot.Acwr = 1.05m;
 
         var summary = MetricSummary.From([snapshot]);
 
         Assert.Equal(78m, summary.LatestCardioLoad);
-        Assert.Equal(60m, summary.LatestTargetLoadMin);
-        Assert.Equal(90m, summary.LatestTargetLoadMax);
+        Assert.Equal(75m, summary.LatestTargetLoad);
         Assert.Equal(1.05m, summary.LatestAcwr);
         Assert.Equal(AcwrStatus.OptimalZone, summary.LatestAcwrStatus);
     }

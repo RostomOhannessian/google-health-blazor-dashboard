@@ -99,22 +99,6 @@ public sealed class GoogleHealthApiClientTests
                     }
                     """);
 
-            if (path.Contains("active-zone-minutes"))
-                return Json("""
-                    {
-                      "dailyRollupDataPoints": [
-                        {
-                          "civilStartTime": { "date": { "year": 2026, "month": 7, "day": 18 } },
-                          "activeZoneMinutes": {
-                            "sumInFatBurnHeartZone": 18,
-                            "sumInCardioHeartZone": 20,
-                            "sumInPeakHeartZone": 12
-                          }
-                        }
-                      ]
-                    }
-                    """);
-
             if (path.Contains("nutrition-log"))
                 return Json("""
                     {
@@ -147,7 +131,6 @@ public sealed class GoogleHealthApiClientTests
         Assert.Equal(46.8m, snapshot.DailyVo2MaxMlKgMin);
         Assert.Equal(47.2m, snapshot.RunVo2MaxMlKgMin);
         Assert.Null(snapshot.CardioLoad);
-        Assert.Equal(50m, snapshot.ActiveZoneMinutes);
         Assert.Equal(2200, snapshot.ConsumedCaloriesKcal);
         Assert.Equal(260.5m, snapshot.CarbohydratesGrams);
         Assert.Equal(70m, snapshot.FatGrams);
@@ -155,29 +138,13 @@ public sealed class GoogleHealthApiClientTests
     }
 
     [Fact]
-    public async Task FetchDailyMetricsAsync_MapsActiveZoneMinutesAndPreferredSleepSession()
+    public async Task FetchDailyMetricsAsync_MapsPreferredSleepSession()
     {
         var handler = new StubHttpMessageHandler(request =>
         {
             var path = request.RequestUri!.ToString();
             if (path.Contains("users/me/settings"))
                 return Json("""{"timeZone":"UTC"}""");
-
-            if (path.Contains("active-zone-minutes"))
-                return Json("""
-                    {
-                      "dailyRollupDataPoints": [
-                        {
-                          "civilStartTime": {"date": {"year": 2026, "month": 7, "day": 18}},
-                          "activeZoneMinutes": {
-                            "sumInFatBurnHeartZone": 18,
-                            "sumInCardioHeartZone": 40,
-                            "sumInPeakHeartZone": 20
-                          }
-                        }
-                      ]
-                    }
-                    """);
 
             if (path.Contains("dataTypes/sleep/dataPoints"))
                 return Json("""
@@ -236,9 +203,6 @@ public sealed class GoogleHealthApiClientTests
 
         var snapshot = Assert.Single(snapshots);
         Assert.Null(snapshot.CardioLoad);
-        Assert.Equal(78m, snapshot.ActiveZoneMinutes);
-        Assert.Null(snapshot.TargetLoadMin);
-        Assert.Null(snapshot.TargetLoadMax);
         Assert.Equal(91m, snapshot.SleepEfficiency);
         Assert.Equal(85, snapshot.DeepSleepMinutes);
         Assert.Equal(105, snapshot.RemSleepMinutes);
@@ -268,9 +232,6 @@ public sealed class GoogleHealthApiClientTests
         var snapshot = Assert.Single(snapshots);
         Assert.Equal(58, snapshot.RestingHeartRateBpm);
         Assert.Null(snapshot.CardioLoad);
-        Assert.Null(snapshot.ActiveZoneMinutes);
-        Assert.Null(snapshot.TargetLoadMin);
-        Assert.Null(snapshot.TargetLoadMax);
         Assert.DoesNotContain(
             handler.Requests,
             request => request.Uri.Contains("daily-cardio-load")
@@ -278,24 +239,6 @@ public sealed class GoogleHealthApiClientTests
                 || request.Uri.Contains("training-load")
                 || request.Uri.Contains("daily-target-load")
                 || request.Uri.Contains("target-load"));
-    }
-
-    [Fact]
-    public async Task FetchDailyMetricsAsync_ActiveZoneMinutesFailureStillFailsTheFetch()
-    {
-        var handler = new StubHttpMessageHandler(request =>
-            request.RequestUri!.ToString().Contains("active-zone-minutes")
-                ? Error(HttpStatusCode.ServiceUnavailable, "temporary outage")
-                : Json("""{}"""));
-
-        var exception = await Assert.ThrowsAsync<GoogleHealthApiException>(
-            () => CreateClient(handler).FetchDailyMetricsAsync(
-                "token",
-                new DateOnly(2026, 7, 18),
-                new DateOnly(2026, 7, 18),
-                CancellationToken.None));
-
-        Assert.Equal(HttpStatusCode.ServiceUnavailable, exception.StatusCode);
     }
 
     [Fact]

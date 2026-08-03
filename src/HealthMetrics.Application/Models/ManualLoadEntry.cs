@@ -3,8 +3,7 @@ namespace HealthMetrics.Application.Models;
 public sealed record ManualLoadEntry(
     DateOnly MetricDate,
     decimal? CardioLoad,
-    decimal? TargetLoadMin,
-    decimal? TargetLoadMax);
+    decimal? TargetLoad);
 
 public sealed record ManualLoadEntryResult(bool Succeeded, string? ErrorMessage = null)
 {

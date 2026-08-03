@@ -36,3 +36,20 @@
 .manual-load-cell:hover {
     background-color: var(--bs-tertiary-bg);
 }
+
+.weekly-summary-row > th,
+.weekly-summary-row > td {
+    background-color: var(--bs-info-bg-subtle, #cff4fc) !important;
+    border-top: 2px solid var(--bs-info-border-subtle, #9eeaf9) !important;
+    color: var(--bs-info-text-emphasis, #055160) !important;
+    font-weight: 600;
+    vertical-align: middle;
+}
+
+.weekly-summary-label {
+    white-space: nowrap;
+}
+
+.weekly-summary-row > td {
+    font-variant-numeric: tabular-nums;
+}

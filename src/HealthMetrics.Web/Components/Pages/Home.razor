@@ -176,7 +176,13 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h2 class="modal-title h5 mb-0" id="manual-load-modal-heading">Manual Cardio Load and Weekly Target Load</h2>
-                    <button class="btn-close" type="button" aria-label="Close" autofocus @onclick="CloseManualLoadModal" disabled="@isSavingManual"></button>
+                    <button class="btn-close"
+                            type="button"
+                            aria-label="Close"
+                            autofocus
+                            @onmousedown:preventDefault
+                            @onclick="CloseManualLoadModal"
+                            disabled="@isSavingManual"></button>
                 </div>
                 <div class="modal-body">
                     <p class="mb-3" id="manual-load-help">
@@ -189,7 +195,7 @@
                                 <input id="manual-load-autosave"
                                        class="form-check-input"
                                        type="checkbox"
-                                       @onmousedown="SuppressNextManualLoadAutoSave"
+                                       @onmousedown:preventDefault
                                        @bind="manualAutoSaveEnabled"
                                        @bind:after="HandleManualAutoSaveSettingChanged" />
                                 <label class="form-check-label" for="manual-load-autosave">Enable autosave</label>
@@ -206,12 +212,14 @@
                                     <div class="d-flex gap-2 mt-2">
                                         <button class="btn btn-outline-secondary btn-sm"
                                                 type="button"
+                                                @onmousedown:preventDefault
                                                 @onclick="@(() => ChangeManualLoadDate(-1))"
                                                 disabled="@isSavingManual">
                                             Previous day
                                         </button>
                                         <button class="btn btn-outline-secondary btn-sm"
                                                 type="button"
+                                                @onmousedown:preventDefault
                                                 @onclick="@(() => ChangeManualLoadDate(1))"
                                                 disabled="@isSavingManual">
                                             Next day
@@ -253,20 +261,20 @@
                             <div class="d-flex flex-wrap gap-2">
                                 <button class="btn btn-primary"
                                         type="submit"
-                                        @onmousedown="SuppressNextManualLoadAutoSave"
+                                        @onmousedown:preventDefault
                                         disabled="@isSavingManual">
                                     @(isSavingManual ? "Saving…" : "Save manual load")
                                 </button>
                                 <button class="btn btn-outline-secondary"
                                         type="button"
-                                        @onmousedown="SuppressNextManualLoadAutoSave"
+                                        @onmousedown:preventDefault
                                         @onclick="ResetManualLoadInputs"
                                         disabled="@isSavingManual">
                                     Reset unsaved changes
                                 </button>
                                 <button class="btn btn-outline-danger"
                                         type="button"
-                                        @onmousedown="SuppressNextManualLoadAutoSave"
+                                        @onmousedown:preventDefault
                                         @onclick="BeginManualLoadClear"
                                         disabled="@isSavingManual">
                                     Clear saved values
@@ -282,10 +290,18 @@
                                 Other saved health metrics will not be changed.
                             </p>
                             <div class="d-flex flex-wrap gap-2">
-                                <button class="btn btn-danger" type="button" @onclick="ClearManualLoadAsync" disabled="@isSavingManual">
+                                <button class="btn btn-danger"
+                                        type="button"
+                                        @onmousedown:preventDefault
+                                        @onclick="ClearManualLoadAsync"
+                                        disabled="@isSavingManual">
                                     Yes, clear saved values
                                 </button>
-                                <button class="btn btn-outline-secondary" type="button" @onclick="CancelManualLoadClear" disabled="@isSavingManual">
+                                <button class="btn btn-outline-secondary"
+                                        type="button"
+                                        @onmousedown:preventDefault
+                                        @onclick="CancelManualLoadClear"
+                                        disabled="@isSavingManual">
                                     Cancel
                                 </button>
                             </div>
@@ -302,7 +318,11 @@
                     }
                 </div>
                 <div class="modal-footer">
-                    <button class="btn btn-outline-secondary" type="button" @onclick="CloseManualLoadModal" disabled="@isSavingManual">
+                    <button class="btn btn-outline-secondary"
+                            type="button"
+                            @onmousedown:preventDefault
+                            @onclick="CloseManualLoadModal"
+                            disabled="@isSavingManual">
                         Close
                     </button>
                 </div>
@@ -371,30 +391,52 @@
             }
             else
             {
-                @foreach (var tableRow in WeeklyTargetMergedRows)
+                @foreach (var weeklyGroup in WeeklyMetricGroups)
                 {
-                    var metric = tableRow.Metric;
-                    <tr>
-                        <td>@metric.MetricDate.ToString("ddd, MMM d")</td>
-                        <td class="border-start">@Display(metric.RestingHeartRateBpm)</td>
-                        <td>@Display(metric.HrvRmssdMilliseconds, "F3")</td>
-                        <td class="border-start">@Display(metric.DailyVo2MaxMlKgMin, "F1")</td>
-                        <td>@Display(metric.RunVo2MaxMlKgMin)</td>
-                        <td class="border-start manual-load-cell"
-                            title="Double-click to edit manual load"
-                            @ondblclick="@(() => OpenManualLoadModalForDate(metric.MetricDate))">
-                            @Display(metric.CardioLoad, "F1")
-                        </td>
-                        @if (tableRow.TargetLoadRowSpan > 0)
-                        {
-                            <td rowspan="@tableRow.TargetLoadRowSpan" class="align-middle">@TargetLoadText(metric.TargetLoad)</td>
-                        }
-                        <td>@Display(metric.Acwr, "F2")</td>
-                        <td class="border-start">@Display(metric.SleepEfficiency, "F2")</td>
-                        <td class="border-start">@Display(metric.ConsumedCaloriesKcal)</td>
-                        <td>@Display(metric.CarbohydratesGrams, "F2")</td>
-                        <td>@Display(metric.FatGrams, "F2")</td>
-                        <td>@Display(metric.ProteinGrams, "F2")</td>
+                    @foreach (var tableRow in weeklyGroup.DailyRows)
+                    {
+                        var metric = tableRow.Metric;
+                        <tr>
+                            <td>@metric.MetricDate.ToString("ddd, MMM d")</td>
+                            <td class="border-start">@Display(metric.RestingHeartRateBpm)</td>
+                            <td>@Display(metric.HrvRmssdMilliseconds, "F3")</td>
+                            <td class="border-start">@Display(metric.DailyVo2MaxMlKgMin, "F1")</td>
+                            <td>@Display(metric.RunVo2MaxMlKgMin)</td>
+                            <td class="border-start manual-load-cell"
+                                title="Double-click to edit manual load"
+                                @ondblclick="@(() => OpenManualLoadModalForDate(metric.MetricDate))">
+                                @Display(metric.CardioLoad, "F1")
+                            </td>
+                            @if (tableRow.TargetLoadRowSpan > 0)
+                            {
+                                <td rowspan="@tableRow.TargetLoadRowSpan" class="align-middle">@TargetLoadText(metric.TargetLoad)</td>
+                            }
+                            <td>@Display(metric.Acwr, "F2")</td>
+                            <td class="border-start">@Display(metric.SleepEfficiency, "F2")</td>
+                            <td class="border-start">@Display(metric.ConsumedCaloriesKcal)</td>
+                            <td>@Display(metric.CarbohydratesGrams, "F2")</td>
+                            <td>@Display(metric.FatGrams, "F2")</td>
+                            <td>@Display(metric.ProteinGrams, "F2")</td>
+                        </tr>
+                    }
+                    <tr class="weekly-summary-row">
+                        <th scope="row"
+                            class="weekly-summary-label"
+                            title="Average of the recorded values for this Monday-Sunday week">
+                            @WeeklySummaryLabel(weeklyGroup.WeekStart)
+                        </th>
+                        <td class="border-start">@Display(weeklyGroup.Averages.RestingHeartRateBpm, "F1")</td>
+                        <td>@Display(weeklyGroup.Averages.HrvRmssdMilliseconds, "F3")</td>
+                        <td class="border-start">@Display(weeklyGroup.Averages.DailyVo2MaxMlKgMin, "F1")</td>
+                        <td>@Display(weeklyGroup.Averages.RunVo2MaxMlKgMin, "F1")</td>
+                        <td class="border-start">@Display(weeklyGroup.Averages.CardioLoad, "F1")</td>
+                        <td>@Display(weeklyGroup.Averages.TargetLoad, "F1")</td>
+                        <td>@Display(weeklyGroup.Averages.Acwr, "F2")</td>
+                        <td class="border-start">@Display(weeklyGroup.Averages.SleepEfficiency, "F2")</td>
+                        <td class="border-start">@Display(weeklyGroup.Averages.ConsumedCaloriesKcal, "F1")</td>
+                        <td>@Display(weeklyGroup.Averages.CarbohydratesGrams, "F2")</td>
+                        <td>@Display(weeklyGroup.Averages.FatGrams, "F2")</td>
+                        <td>@Display(weeklyGroup.Averages.ProteinGrams, "F2")</td>
                     </tr>
                 }
             }
@@ -475,7 +517,6 @@
     private string manualTargetLoadText = string.Empty;
     private CancellationTokenSource? manualAutoSaveCts;
     private bool manualAutoSaveEnabled;
-    private bool suppressNextManualAutoSave;
     private bool isConfirmingManualClear;
     private bool isManualLoadModalOpen;
     private MetricRange selectedRange = MetricRange.ThirtyDays;
@@ -532,8 +573,8 @@
             _ => Sort(metrics, metric => metric.MetricDate)
         };
 
-    private IEnumerable<MetricTableRow> WeeklyTargetMergedRows =>
-        MergeWeeklyTargetCells(SortedMetrics);
+    private IEnumerable<WeeklyMetricGroup> WeeklyMetricGroups =>
+        GroupWeeklyMetrics(SortedMetrics);
 
     protected override async Task OnInitializedAsync()
     {
@@ -631,7 +672,6 @@
     private void OpenManualLoadModalForDate(DateOnly metricDate)
     {
         CancelPendingManualAutoSave();
-        suppressNextManualAutoSave = false;
         isManualLoadModalOpen = true;
         isConfirmingManualClear = false;
         manualEntryError = false;
@@ -646,7 +686,6 @@
             return;
 
         CancelPendingManualAutoSave();
-        suppressNextManualAutoSave = false;
         isManualLoadModalOpen = false;
         isConfirmingManualClear = false;
     }
@@ -761,12 +800,6 @@
 
     private async Task AutoSaveManualLoadOnBlurAsync(FocusEventArgs _)
     {
-        if (suppressNextManualAutoSave)
-        {
-            suppressNextManualAutoSave = false;
-            return;
-        }
-
         if (!manualAutoSaveEnabled)
         {
             CancelPendingManualAutoSave();
@@ -806,12 +839,6 @@
     {
         if (!manualAutoSaveEnabled)
             CancelPendingManualAutoSave();
-    }
-
-    private void SuppressNextManualLoadAutoSave(MouseEventArgs _)
-    {
-        suppressNextManualAutoSave = true;
-        CancelPendingManualAutoSave();
     }
 
     private static bool IsManualLoadEditKey(KeyboardEventArgs args) =>
@@ -904,7 +931,6 @@
     private void ResetManualLoadInputs(bool showFeedback)
     {
         CancelPendingManualAutoSave();
-        suppressNextManualAutoSave = false;
         var snapshot = loadHistory.SingleOrDefault(metric => metric.MetricDate == manualLoadForm.MetricDate);
         var weekStart = WeeklyLoadCalculator.GetWeekStart(manualLoadForm.MetricDate);
         manualLoadForm.CardioLoad = snapshot?.CardioLoad;
@@ -924,7 +950,6 @@
 
     private void BeginManualLoadClear()
     {
-        suppressNextManualAutoSave = false;
         isConfirmingManualClear = true;
         manualEntryMessage = null;
     }
@@ -1010,7 +1035,7 @@
         Func<DailyMetricSnapshot, T> selector) =>
         sortDescending ? source.OrderByDescending(selector) : source.OrderBy(selector);
 
-    private static IEnumerable<MetricTableRow> MergeWeeklyTargetCells(
+    private static IEnumerable<WeeklyMetricGroup> GroupWeeklyMetrics(
         IEnumerable<DailyMetricSnapshot> sortedMetrics)
     {
         var rows = sortedMetrics.ToList();
@@ -1024,14 +1049,23 @@
                 groupEnd++;
             }
 
-            // Merge only contiguous rows so non-date sorts cannot span unrelated weeks.
-            yield return new MetricTableRow(rows[index], groupEnd - index);
-            for (var rowIndex = index + 1; rowIndex < groupEnd; rowIndex++)
-                yield return new MetricTableRow(rows[rowIndex], 0);
+            var weekRows = rows.GetRange(index, groupEnd - index);
+            var tableRows = weekRows
+                .Select((metric, rowIndex) => new MetricTableRow(metric, rowIndex == 0 ? weekRows.Count : 0))
+                .ToList();
+
+            // Group only contiguous rows so non-date sorts cannot span unrelated weeks.
+            yield return new WeeklyMetricGroup(
+                weekStart,
+                tableRows,
+                WeeklyMetricAverages.From(weekStart, weekRows));
 
             index = groupEnd;
         }
     }
+
+    private static string WeeklySummaryLabel(DateOnly weekStart) =>
+        $"Week of {weekStart.ToString("MMM d", CultureInfo.CurrentCulture)} - {weekStart.AddDays(6).ToString("MMM d", CultureInfo.CurrentCulture)} average";
 
     private string SortIndicator(string column) =>
         sortColumn == column ? (sortDescending ? "▼" : "▲") : string.Empty;
@@ -1118,4 +1152,9 @@
     private sealed record MetricTableRow(
         DailyMetricSnapshot Metric,
         int TargetLoadRowSpan);
+
+    private sealed record WeeklyMetricGroup(
+        DateOnly WeekStart,
+        IReadOnlyList<MetricTableRow> DailyRows,
+        WeeklyMetricAverages Averages);
 }

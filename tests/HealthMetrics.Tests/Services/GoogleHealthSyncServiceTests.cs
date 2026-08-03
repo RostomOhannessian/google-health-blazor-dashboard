@@ -44,6 +44,15 @@ public sealed class GoogleHealthSyncServiceTests : IAsyncLifetime
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => svc.SyncRecentDaysAsync(days));
     }
 
+    [Fact]
+    public async Task SyncRecentDaysAsync_AllowsLeapYearDayCount()
+    {
+        var result = await CreateService().SyncRecentDaysAsync(366);
+
+        Assert.Equal(366, result.RequestedDays);
+        Assert.Equal(366, result.PersistedDays);
+    }
+
     // ── Merge: null fields from a re-sync must not overwrite stored values ───
 
     [Fact]

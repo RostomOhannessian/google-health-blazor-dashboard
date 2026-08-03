@@ -41,10 +41,11 @@ writes `CardioLoad`, `TargetLoad`, or `Acwr`; those nullable fields are a
 distinct proprietary manual series edited in the dashboard.
 
 Manual weekly target amounts are user-entered and may be cleared. Each target
-applies from Monday through Sunday; saving a target updates every existing
-daily record in the selected week, and the dashboard projects it across that
-week for display. Targets are not automatically calculated, and are not a
-Google, Fitbit, or other provider recommendation.
+applies from Monday through Sunday; saving a target writes it to each of the
+seven daily records in the selected week, creating missing records as needed.
+The dashboard projects it across that week for display. Targets are not
+automatically calculated, and are not a Google, Fitbit, or other provider
+recommendation.
 
 After every successful sync, manual save, and demo seed, the app recalculates
 the persisted manual ACWR:

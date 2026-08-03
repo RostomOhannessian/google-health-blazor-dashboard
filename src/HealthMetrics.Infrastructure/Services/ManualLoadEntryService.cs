@@ -15,20 +15,6 @@ internal sealed class ManualLoadEntryService(HealthMetricsDbContext dbContext) :
         if (validationError is not null)
             return new ManualLoadEntryResult(false, validationError);
 
-        var snapshot = await dbContext.DailyMetricSnapshots.SingleOrDefaultAsync(
-            item => item.UserKey == LocalUser.Key && item.MetricDate == entry.MetricDate,
-            cancellationToken);
-
-        if (snapshot is null)
-        {
-            snapshot = new DailyMetricSnapshot
-            {
-                UserKey = LocalUser.Key,
-                MetricDate = entry.MetricDate
-            };
-            dbContext.DailyMetricSnapshots.Add(snapshot);
-        }
-
         var weekStart = WeeklyLoadCalculator.GetWeekStart(entry.MetricDate);
         var weekEnd = weekStart.AddDays(6);
         var weeklySnapshots = await dbContext.DailyMetricSnapshots
@@ -37,8 +23,42 @@ internal sealed class ManualLoadEntryService(HealthMetricsDbContext dbContext) :
                 && item.MetricDate >= weekStart
                 && item.MetricDate <= weekEnd)
             .ToListAsync(cancellationToken);
-        foreach (var weeklySnapshot in weeklySnapshots)
-            weeklySnapshot.TargetLoad = entry.TargetLoad;
+        var snapshotsByDate = weeklySnapshots.ToDictionary(snapshot => snapshot.MetricDate);
+        if (!snapshotsByDate.TryGetValue(entry.MetricDate, out var snapshot))
+        {
+            snapshot = new DailyMetricSnapshot
+            {
+                UserKey = LocalUser.Key,
+                MetricDate = entry.MetricDate
+            };
+            dbContext.DailyMetricSnapshots.Add(snapshot);
+            snapshotsByDate.Add(snapshot.MetricDate, snapshot);
+        }
+
+        if (entry.TargetLoad.HasValue)
+        {
+            for (var dayOffset = 0; dayOffset < 7; dayOffset++)
+            {
+                var metricDate = weekStart.AddDays(dayOffset);
+                if (!snapshotsByDate.TryGetValue(metricDate, out var weeklySnapshot))
+                {
+                    weeklySnapshot = new DailyMetricSnapshot
+                    {
+                        UserKey = LocalUser.Key,
+                        MetricDate = metricDate
+                    };
+                    dbContext.DailyMetricSnapshots.Add(weeklySnapshot);
+                    snapshotsByDate.Add(metricDate, weeklySnapshot);
+                }
+
+                weeklySnapshot.TargetLoad = entry.TargetLoad;
+            }
+        }
+        else
+        {
+            foreach (var weeklySnapshot in snapshotsByDate.Values)
+                weeklySnapshot.TargetLoad = null;
+        }
 
         snapshot.CardioLoad = entry.CardioLoad;
         snapshot.TargetLoad = entry.TargetLoad;

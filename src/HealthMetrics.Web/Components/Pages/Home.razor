@@ -260,8 +260,8 @@
 <div class="d-flex align-items-baseline justify-content-between mb-2">
     <h2 class="h5 mb-0">Daily snapshots</h2>
     <div class="d-flex align-items-center gap-3">
-        <a href="/api/metrics/export?days=@selectedDays" class="small text-decoration-none" download>⬇ Export CSV</a>
-        <small class="text-muted">@metrics.Count of @selectedDays days · — = not recorded for that date</small>
+        <a href="/api/metrics/export?days=@SelectedDayCount" class="small text-decoration-none" download>⬇ Export CSV</a>
+        <small class="text-muted">@metrics.Count of @SelectedDayCount days · — = not recorded for that date</small>
     </div>
 </div>
 <div class="table-responsive">
@@ -386,7 +386,6 @@
     private readonly ManualLoadForm manualLoadForm = new(DateOnly.FromDateTime(DateTime.UtcNow));
     private bool isConfirmingManualClear;
     private MetricRange selectedRange = MetricRange.ThirtyDays;
-    private int selectedDays = 30;
     private bool chartNeedsRender;
     private ChartMode chartMode = ChartMode.Heart;
     private string sortColumn = "date";
@@ -405,8 +404,11 @@
 
     private bool IsYearToDate => selectedRange == MetricRange.YearToDate;
 
+    private int SelectedDayCount =>
+        IsYearToDate ? YearToDateDays : (int)selectedRange;
+
     private string SyncRangeText =>
-        IsYearToDate ? "Sync since January 1" : $"Sync last {selectedDays} days";
+        IsYearToDate ? "Sync since January 1" : $"Sync last {SelectedDayCount} days";
 
     private IEnumerable<DailyMetricSnapshot> SortedMetrics =>
         sortColumn switch
@@ -485,17 +487,18 @@
 
     private async Task SyncNowAsync()
     {
+        var dayCount = SelectedDayCount;
         try
         {
             lastError = null;
             isSyncing = true;
             StateHasChanged();
-            await SyncService.SyncRecentDaysAsync(selectedDays, _cts.Token);
+            await SyncService.SyncRecentDaysAsync(dayCount, _cts.Token);
             await LoadDataAsync();
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Manual sync failed for {Days} days.", selectedDays);
+            Logger.LogError(ex, "Manual sync failed for {Days} days.", dayCount);
             lastError = "Sync failed. Check the application logs for details.";
         }
         finally
@@ -509,10 +512,9 @@
         try
         {
             lastError = null;
-            if (IsYearToDate)
-                selectedDays = YearToDateDays;
+            var dayCount = SelectedDayCount;
             connectionStatus = await OAuthService.GetConnectionStatusAsync(_cts.Token);
-            var loaded = await MetricQueryService.GetRecentMetricsAsync(selectedDays, _cts.Token);
+            var loaded = await MetricQueryService.GetRecentMetricsAsync(dayCount, _cts.Token);
             var loadedLoadHistory = await MetricQueryService.GetAllMetricsAsync(_cts.Token);
             metrics.Clear();
             metrics.AddRange(loaded);
@@ -538,9 +540,6 @@
     private async Task ChangeRangeAsync(MetricRange range)
     {
         selectedRange = range;
-        selectedDays = range == MetricRange.YearToDate
-            ? YearToDateDays
-            : (int)range;
         await LoadDataAsync();
     }
 

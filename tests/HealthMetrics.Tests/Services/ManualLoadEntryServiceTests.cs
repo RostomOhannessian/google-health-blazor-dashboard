@@ -40,11 +40,15 @@ public sealed class ManualLoadEntryServiceTests : IAsyncLifetime
         var result = await new ManualLoadEntryService(dbContext).SaveAsync(
             new ManualLoadEntry(date, 78m, 75m));
 
-        var stored = await dbContext.DailyMetricSnapshots.SingleAsync();
+        var stored = await dbContext.DailyMetricSnapshots
+            .SingleAsync(snapshot => snapshot.MetricDate == date);
+        var weeklySnapshots = await dbContext.DailyMetricSnapshots.ToListAsync();
         Assert.True(result.Succeeded);
         Assert.Equal(78m, stored.CardioLoad);
         Assert.Equal(75m, stored.TargetLoad);
         Assert.Equal(58, stored.RestingHeartRateBpm);
+        Assert.Equal(7, weeklySnapshots.Count);
+        Assert.All(weeklySnapshots, snapshot => Assert.Equal(75m, snapshot.TargetLoad));
     }
 
     [Fact]
@@ -65,10 +69,10 @@ public sealed class ManualLoadEntryServiceTests : IAsyncLifetime
             .OrderBy(snapshot => snapshot.MetricDate)
             .ToListAsync();
         Assert.True(result.Succeeded);
-        Assert.Equal([monday, selectedDate, friday], stored.Select(snapshot => snapshot.MetricDate));
-        Assert.Equal(80m, stored[0].TargetLoad);
-        Assert.Equal(80m, stored[1].TargetLoad);
-        Assert.Equal(80m, stored[2].TargetLoad);
+        Assert.Equal(
+            Enumerable.Range(0, 7).Select(monday.AddDays),
+            stored.Select(snapshot => snapshot.MetricDate));
+        Assert.All(stored, snapshot => Assert.Equal(80m, snapshot.TargetLoad));
     }
 
     [Fact]
@@ -107,10 +111,14 @@ public sealed class ManualLoadEntryServiceTests : IAsyncLifetime
         var result = await new ManualLoadEntryService(dbContext).SaveAsync(
             new ManualLoadEntry(date, null, 80m));
 
-        var stored = await dbContext.DailyMetricSnapshots.SingleAsync();
+        var stored = await dbContext.DailyMetricSnapshots
+            .SingleAsync(snapshot => snapshot.MetricDate == date);
+        var weeklySnapshots = await dbContext.DailyMetricSnapshots.ToListAsync();
         Assert.True(result.Succeeded);
         Assert.Null(stored.CardioLoad);
         Assert.Equal(80m, stored.TargetLoad);
+        Assert.Equal(7, weeklySnapshots.Count);
+        Assert.All(weeklySnapshots, snapshot => Assert.Equal(80m, snapshot.TargetLoad));
     }
 
     [Theory]

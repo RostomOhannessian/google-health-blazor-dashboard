@@ -21,7 +21,10 @@ internal sealed class MetricQueryService(HealthMetricsDbContext dbContext) : IMe
 
         var snapshots = await dbContext.DailyMetricSnapshots
             .AsNoTracking()
-            .Where(item => item.UserKey == LocalUser.Key && item.MetricDate >= cutoff)
+            .Where(item =>
+                item.UserKey == LocalUser.Key
+                && item.MetricDate >= cutoff
+                && item.MetricDate <= today)
             .OrderByDescending(item => item.MetricDate)
             .ToListAsync(cancellationToken);
 
@@ -31,9 +34,10 @@ internal sealed class MetricQueryService(HealthMetricsDbContext dbContext) : IMe
     public async Task<IReadOnlyList<DailyMetricSnapshot>> GetAllMetricsAsync(
         CancellationToken cancellationToken = default)
     {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var snapshots = await dbContext.DailyMetricSnapshots
             .AsNoTracking()
-            .Where(item => item.UserKey == LocalUser.Key)
+            .Where(item => item.UserKey == LocalUser.Key && item.MetricDate <= today)
             .OrderByDescending(item => item.MetricDate)
             .ToListAsync(cancellationToken);
 

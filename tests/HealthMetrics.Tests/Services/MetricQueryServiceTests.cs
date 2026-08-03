@@ -60,6 +60,7 @@ public sealed class MetricQueryServiceTests
             new DailyMetricSnapshot { UserKey = LocalUser.Key, MetricDate = today, RestingHeartRateBpm = 50 },
             new DailyMetricSnapshot { UserKey = LocalUser.Key, MetricDate = today.AddDays(-2), RestingHeartRateBpm = 52 },
             new DailyMetricSnapshot { UserKey = LocalUser.Key, MetricDate = today.AddDays(-10), RestingHeartRateBpm = 57 },
+            new DailyMetricSnapshot { UserKey = LocalUser.Key, MetricDate = today.AddDays(1), RestingHeartRateBpm = 49 },
             new DailyMetricSnapshot { UserKey = "another-user", MetricDate = today.AddDays(-1), RestingHeartRateBpm = 61 });
         await db.SaveChangesAsync();
 
@@ -127,6 +128,13 @@ public sealed class MetricQueryServiceTests
                 UserKey = LocalUser.Key,
                 MetricDate = today,
                 CardioLoad = 75m,
+                TargetLoad = 180m
+            },
+            new DailyMetricSnapshot
+            {
+                UserKey = LocalUser.Key,
+                MetricDate = today.AddDays(1),
+                CardioLoad = 77m,
                 TargetLoad = 180m
             },
             new DailyMetricSnapshot

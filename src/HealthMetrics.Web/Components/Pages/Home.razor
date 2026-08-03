@@ -50,39 +50,6 @@
     <div class="alert alert-danger" role="alert">@lastError</div>
 }
 
-<div class="card mb-4">
-    <div class="card-header fw-semibold">Manual Cardio Load entry</div>
-    <div class="card-body">
-        <div class="row g-2 align-items-end">
-            <div class="col-sm-3">
-                <label class="form-label" for="manual-load-date">Date</label>
-                <InputDate id="manual-load-date" class="form-control" @bind-Value="manualMetricDate" />
-            </div>
-            <div class="col-sm-3">
-                <label class="form-label" for="manual-cardio-load">Cardio Load</label>
-                <InputNumber id="manual-cardio-load" class="form-control" @bind-Value="manualCardioLoad" />
-            </div>
-            <div class="col-sm-2">
-                <label class="form-label" for="manual-target-min">Target min</label>
-                <InputNumber id="manual-target-min" class="form-control" @bind-Value="manualTargetLoadMin" />
-            </div>
-            <div class="col-sm-2">
-                <label class="form-label" for="manual-target-max">Target max</label>
-                <InputNumber id="manual-target-max" class="form-control" @bind-Value="manualTargetLoadMax" />
-            </div>
-            <div class="col-sm-2 d-flex gap-2">
-                <button class="btn btn-primary" type="button" @onclick="SaveManualLoadAsync" disabled="@isSavingManual">@(isSavingManual ? "Saving…" : "Save")</button>
-                <button class="btn btn-outline-secondary" type="button" @onclick="ClearManualLoadInputs">Clear</button>
-            </div>
-        </div>
-        <div class="form-text">Leave a value blank and save to clear it. Manual values never replace synced provider metrics.</div>
-        @if (!string.IsNullOrWhiteSpace(manualEntryMessage))
-        {
-            <div class="alert @(manualEntryError ? "alert-danger" : "alert-success") mt-3 mb-0" role="alert">@manualEntryMessage</div>
-        }
-    </div>
-</div>
-
 <div class="row g-3 mb-4">
     <div class="col-sm-6 col-xl-2">
         <div class="card h-100 @(connectionStatus?.IsConnected == true && connectionStatus.RequiresReconnect != true ? "border-success" : "border-warning")">
@@ -158,7 +125,8 @@
             <div class="card-body">
                 <h6 class="card-subtitle text-muted mb-1">Manual Cardio Load</h6>
                 <p class="card-text fw-semibold mb-0">@CardioLoadText(summary)</p>
-                <small class="text-muted">User-entered load and target</small>
+                <small class="text-muted d-block">Proprietary, user-entered load and target</small>
+                <a class="small" href="#manual-load-entry">Enter or edit manual load</a>
             </div>
         </div>
     </div>
@@ -173,7 +141,7 @@
                         <span class="badge @AcwrBadge(summary.LatestAcwrStatus)">@AcwrLabel(summary.LatestAcwrStatus)</span>
                     }
                 </p>
-                <small class="text-muted">7-day acute / 28-day chronic</small>
+                <small class="text-muted">Calculated from manual Cardio Load only</small>
             </div>
         </div>
     </div>
@@ -182,7 +150,7 @@
             <div class="card-body">
                 <h6 class="card-subtitle text-muted mb-1">Active Zone Minutes (AZM)</h6>
                 <p class="card-text fw-semibold mb-0">@Display(summary?.LatestActiveZoneMinutes, "F1")</p>
-                <small class="text-muted">Synced from Google Health</small>
+                <small class="text-muted">Synced provider metric from Google Health</small>
             </div>
         </div>
     </div>
@@ -197,11 +165,121 @@
                         <span class="badge @AcwrBadge(summary.LatestActiveZoneMinutesAcwrStatus)">@AcwrLabel(summary.LatestActiveZoneMinutesAcwrStatus)</span>
                     }
                 </p>
-                <small class="text-muted">7-day acute / 28-day chronic</small>
+                <small class="text-muted">Calculated from synced provider AZM</small>
             </div>
         </div>
     </div>
 </div>
+
+<section class="card mb-4" id="manual-load-entry" aria-labelledby="manual-load-entry-heading" tabindex="-1">
+    <div class="card-header">
+        <h2 class="h5 mb-0" id="manual-load-entry-heading">Manual Cardio Load and Target Load</h2>
+    </div>
+    <div class="card-body">
+        <p class="mb-3" id="manual-load-help">
+            Record proprietary manual Cardio Load and Target Load values. They drive the Manual Cardio ACWR calculation only;
+            they never overwrite Google Health Active Zone Minutes (AZM) or AZM ACWR.
+        </p>
+        <EditForm Model="manualLoadForm" OnSubmit="SaveManualLoadAsync" FormName="manual-load-entry-form">
+            <fieldset aria-describedby="manual-load-help">
+                <legend class="fs-6 mb-3">Manual load entry</legend>
+                <div class="row g-3">
+                    <div class="col-12 col-md-4 col-xl-3">
+                        <label class="form-label" for="manual-load-date">Date</label>
+                        <InputDate id="manual-load-date"
+                                   class="form-control"
+                                   @bind-Value="manualLoadForm.MetricDate"
+                                   @bind-Value:after="LoadManualInputsForSelectedDate"
+                                   aria-describedby="manual-load-date-help" />
+                        <div class="form-text" id="manual-load-date-help">Choose the day to update.</div>
+                    </div>
+                    <div class="col-12 col-md-4 col-xl-3">
+                        <label class="form-label" for="manual-cardio-load">Cardio Load (load points)</label>
+                        <InputNumber id="manual-cardio-load"
+                                     class="form-control"
+                                     @bind-Value="manualLoadForm.CardioLoad"
+                                     min="0"
+                                     step="0.1"
+                                     inputmode="decimal"
+                                     aria-describedby="manual-cardio-load-help" />
+                        <div class="form-text" id="manual-cardio-load-help">Optional proprietary daily load.</div>
+                    </div>
+                    <div class="col-12 col-md-4 col-xl-3">
+                        <label class="form-label" for="manual-target-min">Target minimum (load points)</label>
+                        <InputNumber id="manual-target-min"
+                                     class="@($"form-control {(HasManualTargetRangeError ? "is-invalid" : string.Empty)}")"
+                                     @bind-Value="manualLoadForm.TargetLoadMin"
+                                     @bind-Value:after="ValidateManualTargetRange"
+                                     min="0"
+                                     step="0.1"
+                                     inputmode="decimal"
+                                     aria-invalid="@HasManualTargetRangeError"
+                                     aria-describedby="@ManualTargetInputDescription" />
+                        <div class="form-text" id="manual-target-help">Optional lower end of your manual target range.</div>
+                    </div>
+                    <div class="col-12 col-md-4 col-xl-3">
+                        <label class="form-label" for="manual-target-max">Target maximum (load points)</label>
+                        <InputNumber id="manual-target-max"
+                                     class="@($"form-control {(HasManualTargetRangeError ? "is-invalid" : string.Empty)}")"
+                                     @bind-Value="manualLoadForm.TargetLoadMax"
+                                     @bind-Value:after="ValidateManualTargetRange"
+                                     min="0"
+                                     step="0.1"
+                                     inputmode="decimal"
+                                     aria-invalid="@HasManualTargetRangeError"
+                                     aria-describedby="@ManualTargetInputDescription" />
+                    </div>
+                </div>
+                @if (HasManualTargetRangeError)
+                {
+                    <div class="invalid-feedback d-block mt-2" id="manual-target-range-error" role="alert">
+                        @manualTargetRangeError
+                    </div>
+                }
+                <p class="form-text mb-3">
+                    All load fields are optional. Leave a value blank and save to clear that existing manual value.
+                </p>
+                <div class="d-flex flex-wrap gap-2">
+                    <button class="btn btn-primary" type="submit" disabled="@isSavingManual">
+                        @(isSavingManual ? "Saving…" : "Save manual load")
+                    </button>
+                    <button class="btn btn-outline-secondary" type="button" @onclick="ResetManualLoadInputs" disabled="@isSavingManual">
+                        Reset unsaved changes
+                    </button>
+                    <button class="btn btn-outline-danger" type="button" @onclick="BeginManualLoadClear" disabled="@isSavingManual">
+                        Clear saved values
+                    </button>
+                </div>
+            </fieldset>
+        </EditForm>
+        @if (isConfirmingManualClear)
+        {
+            <div class="alert alert-warning mt-3 mb-0" role="alert" id="manual-load-clear-confirmation">
+                <p class="mb-2">
+                    Clear all saved manual Cardio Load and Target Load values for @manualLoadForm.MetricDate.ToString("MMMM d, yyyy")?
+                    Synced Google Health AZM values will not be changed.
+                </p>
+                <div class="d-flex flex-wrap gap-2">
+                    <button class="btn btn-danger" type="button" @onclick="ClearManualLoadAsync" disabled="@isSavingManual">
+                        Yes, clear saved values
+                    </button>
+                    <button class="btn btn-outline-secondary" type="button" @onclick="CancelManualLoadClear" disabled="@isSavingManual">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        }
+        @if (!string.IsNullOrWhiteSpace(manualEntryMessage))
+        {
+            <div class="alert @(manualEntryError ? "alert-danger" : "alert-success") mt-3 mb-0"
+                 role="@(manualEntryError ? "alert" : "status")"
+                 aria-live="@(manualEntryError ? "assertive" : "polite")"
+                 id="manual-load-feedback">
+                @manualEntryMessage
+            </div>
+        }
+    </div>
+</section>
 
 @if (HasHeartMetrics || HasLoadMetrics)
 {
@@ -348,10 +426,9 @@
     private string? lastError;
     private string? seedMessage;
     private string? manualEntryMessage;
-    private DateOnly manualMetricDate = DateOnly.FromDateTime(DateTime.UtcNow);
-    private decimal? manualCardioLoad;
-    private decimal? manualTargetLoadMin;
-    private decimal? manualTargetLoadMax;
+    private readonly ManualLoadForm manualLoadForm = new(DateOnly.FromDateTime(DateTime.UtcNow));
+    private bool isConfirmingManualClear;
+    private string? manualTargetRangeError;
     private int selectedDays = 30;
     private bool chartNeedsRender;
     private ChartMode chartMode = ChartMode.Heart;
@@ -368,6 +445,13 @@
             || m.ActiveZoneMinutes.HasValue
             || m.Acwr.HasValue
             || m.ActiveZoneMinutesAcwr.HasValue);
+
+    private bool HasManualTargetRangeError => !string.IsNullOrWhiteSpace(manualTargetRangeError);
+
+    private string ManualTargetInputDescription =>
+        HasManualTargetRangeError
+            ? "manual-target-help manual-target-range-error"
+            : "manual-target-help";
 
     private IEnumerable<DailyMetricSnapshot> SortedMetrics =>
         sortColumn switch
@@ -501,23 +585,34 @@
 
     private async Task SaveManualLoadAsync()
     {
+        ValidateManualTargetRange();
+        if (HasManualTargetRangeError)
+        {
+            manualEntryError = true;
+            manualEntryMessage = manualTargetRangeError;
+            return;
+        }
+
         try
         {
             isSavingManual = true;
             manualEntryMessage = null;
             var result = await ManualLoadEntryService.SaveAsync(
                 new ManualLoadEntry(
-                    manualMetricDate,
-                    manualCardioLoad,
-                    manualTargetLoadMin,
-                    manualTargetLoadMax),
+                    manualLoadForm.MetricDate,
+                    manualLoadForm.CardioLoad,
+                    manualLoadForm.TargetLoadMin,
+                    manualLoadForm.TargetLoadMax),
                 _cts.Token);
             manualEntryError = !result.Succeeded;
             manualEntryMessage = result.Succeeded
-                ? "Manual Cardio Load saved."
+                ? "Manual Cardio Load saved. Synced AZM was not changed."
                 : result.ErrorMessage;
             if (result.Succeeded)
+            {
+                isConfirmingManualClear = false;
                 await LoadDataAsync();
+            }
         }
         catch (Exception ex)
         {
@@ -531,12 +626,43 @@
         }
     }
 
-    private void ClearManualLoadInputs()
+    private void LoadManualInputsForSelectedDate() => ResetManualLoadInputs();
+
+    private void ResetManualLoadInputs()
     {
-        manualCardioLoad = null;
-        manualTargetLoadMin = null;
-        manualTargetLoadMax = null;
+        var snapshot = metrics.SingleOrDefault(metric => metric.MetricDate == manualLoadForm.MetricDate);
+        manualLoadForm.CardioLoad = snapshot?.CardioLoad;
+        manualLoadForm.TargetLoadMin = snapshot?.TargetLoadMin;
+        manualLoadForm.TargetLoadMax = snapshot?.TargetLoadMax;
+        isConfirmingManualClear = false;
+        ValidateManualTargetRange();
+        manualEntryError = false;
+        manualEntryMessage = "Unsaved changes were reset to the saved values for this date.";
+    }
+
+    private void BeginManualLoadClear()
+    {
+        isConfirmingManualClear = true;
         manualEntryMessage = null;
+    }
+
+    private void CancelManualLoadClear() => isConfirmingManualClear = false;
+
+    private async Task ClearManualLoadAsync()
+    {
+        manualLoadForm.CardioLoad = null;
+        manualLoadForm.TargetLoadMin = null;
+        manualLoadForm.TargetLoadMax = null;
+        await SaveManualLoadAsync();
+    }
+
+    private void ValidateManualTargetRange()
+    {
+        manualTargetRangeError = manualLoadForm.TargetLoadMin is not null
+            && manualLoadForm.TargetLoadMax is not null
+            && manualLoadForm.TargetLoadMin > manualLoadForm.TargetLoadMax
+                ? "Target minimum must be less than or equal to the target maximum."
+                : null;
     }
 
     private async Task DisconnectAsync()
@@ -679,5 +805,13 @@
     {
         Heart,
         Load
+    }
+
+    private sealed class ManualLoadForm(DateOnly metricDate)
+    {
+        public DateOnly MetricDate { get; set; } = metricDate;
+        public decimal? CardioLoad { get; set; }
+        public decimal? TargetLoadMin { get; set; }
+        public decimal? TargetLoadMax { get; set; }
     }
 }

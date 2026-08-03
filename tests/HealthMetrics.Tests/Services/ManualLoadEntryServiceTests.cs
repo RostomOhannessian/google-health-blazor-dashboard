@@ -77,6 +77,33 @@ public sealed class ManualLoadEntryServiceTests : IAsyncLifetime
         Assert.Equal(82m, stored.ActiveZoneMinutes);
     }
 
+    [Fact]
+    public async Task SaveAsync_ClearsOnlyBlankManualValuesAndPreservesProviderFields()
+    {
+        var date = new DateOnly(2026, 8, 2);
+        dbContext.DailyMetricSnapshots.Add(new DailyMetricSnapshot
+        {
+            MetricDate = date,
+            CardioLoad = 78m,
+            TargetLoadMin = 60m,
+            TargetLoadMax = 90m,
+            ActiveZoneMinutes = 82m,
+            ActiveZoneMinutesAcwr = 1.08m
+        });
+        await dbContext.SaveChangesAsync();
+
+        var result = await new ManualLoadEntryService(dbContext).SaveAsync(
+            new ManualLoadEntry(date, null, 65m, 95m));
+
+        var stored = await dbContext.DailyMetricSnapshots.SingleAsync();
+        Assert.True(result.Succeeded);
+        Assert.Null(stored.CardioLoad);
+        Assert.Equal(65m, stored.TargetLoadMin);
+        Assert.Equal(95m, stored.TargetLoadMax);
+        Assert.Equal(82m, stored.ActiveZoneMinutes);
+        Assert.Equal(1.08m, stored.ActiveZoneMinutesAcwr);
+    }
+
     [Theory]
     [InlineData(-1d, null, null, "Manual Cardio Load cannot be negative.")]
     [InlineData(null, -1d, null, "Manual target minimum cannot be negative.")]

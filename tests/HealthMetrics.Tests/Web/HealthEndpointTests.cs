@@ -153,12 +153,36 @@ public sealed class HealthEndpointTests
         Assert.Contains("90.0", html);
         Assert.Contains("1.05", html);
         Assert.Contains("Optimal Zone", html);
-        Assert.Contains("Manual Cardio Load entry", html);
+        Assert.Contains("Manual Cardio Load and Target Load", html);
         Assert.Contains("Manual Cardio Load", html);
         Assert.Contains("Active Zone Minutes (AZM)", html);
         Assert.Contains("Manual target", html);
         Assert.Contains("AZM ACWR", html);
         Assert.Contains("Sleep Efficiency (%)", html);
+    }
+
+    [Fact]
+    public async Task HomePage_ManualLoadForm_UsesAccessibleDecimalInputsAndExplainsDataOwnership()
+    {
+        await using var factory = new HealthMetricsWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var html = await client.GetStringAsync("/");
+
+        Assert.Contains("manual-load-entry-form", html);
+        Assert.Contains("<fieldset", html);
+        Assert.Contains("Manual load entry", html);
+        Assert.Contains("Cardio Load (load points)", html);
+        Assert.Contains("Target minimum (load points)", html);
+        Assert.Contains("Target maximum (load points)", html);
+        Assert.Contains("min=\"0\"", html);
+        Assert.Contains("step=\"0.1\"", html);
+        Assert.Contains("inputmode=\"decimal\"", html);
+        Assert.Contains("manual-target-help", html);
+        Assert.Contains("Clear saved values", html);
+        Assert.Contains("They drive the Manual Cardio ACWR calculation only", html);
+        Assert.Contains("never overwrite Google Health Active Zone Minutes (AZM) or AZM ACWR", html);
+        Assert.Contains("Synced provider metric from Google Health", html);
     }
 
     [Fact]

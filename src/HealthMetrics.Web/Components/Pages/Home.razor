@@ -143,7 +143,7 @@
         <div class="card-header d-flex align-items-center justify-content-between gap-2 flex-wrap">
             <span class="fw-semibold">@(chartMode == ChartMode.Load ? "Cardio & load strain" : "Heart rate & HRV trend")</span>
             <div class="btn-group btn-group-sm" role="group" aria-label="Chart metric">
-                <button type="button" class="btn @(chartMode == ChartMode.Heart ? "btn-primary" : "btn-outline-primary")" @onclick="@(() => SetChartModeAsync(ChartMode.Heart))">Heart &amp; HRV</button>
+                <button type="button" class="btn @(chartMode == ChartMode.Heart ? "btn-primary" : "btn-outline-primary")" @onclick="@(() => SetChartModeAsync(ChartMode.Heart))" disabled="@(!HasHeartMetrics)">Heart &amp; HRV</button>
                 <button type="button" class="btn @(chartMode == ChartMode.Load ? "btn-primary" : "btn-outline-primary")" @onclick="@(() => SetChartModeAsync(ChartMode.Load))" disabled="@(!HasLoadMetrics)">Cardio &amp; Load Strain</button>
             </div>
         </div>
@@ -380,6 +380,10 @@
             var loaded = await MetricQueryService.GetRecentMetricsAsync(selectedDays, _cts.Token);
             metrics.Clear();
             metrics.AddRange(loaded);
+            if (!HasHeartMetrics && HasLoadMetrics)
+                chartMode = ChartMode.Load;
+            else if (chartMode == ChartMode.Load && !HasLoadMetrics)
+                chartMode = ChartMode.Heart;
             summary = MetricSummary.From(metrics);
             var history = await MetricQueryService.GetRecentSyncHistoryAsync(10, _cts.Token);
             syncHistory.Clear();

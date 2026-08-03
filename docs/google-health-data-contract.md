@@ -48,6 +48,18 @@ The UI classifies a non-null ratio as **Undertraining** below 0.8, **Optimal
 Zone** from 0.8 through 1.3, **Overreaching** above 1.3 through 1.5, or **High
 Danger Zone** above 1.5. A missing ratio is displayed as `—`.
 
+## CSV contract
+
+`GET /api/metrics/export` emits one invariant-culture row per persisted day with
+this header and column order:
+
+```text
+Date,RestingHR_bpm,HRV_RMSSD_ms,DailyVO2Max_ml_kg_min,RunVO2Max_ml_kg_min,CardioLoad,TargetLoadMin,TargetLoadMax,ACWR,SleepEfficiency_pct,DeepSleep_min,RemSleep_min,Calories_kcal,Carbs_g,Fat_g,Protein_g
+```
+
+Null fields are emitted as empty CSV cells. The table and cards use an em dash
+for the same missing values.
+
 The public Google discovery document used by this integration does not
 currently publish stable cardio-load, training-load, or target-load schemas.
 Those data types are therefore optional flexible candidates; the client keeps

@@ -347,7 +347,9 @@
                 <th class="border-start" title="Double-click a row in this column to edit its manual load">
                     <button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("cardioLoad"))">Cardio Load (Manual) @SortIndicator("cardioLoad")</button>
                 </th>
-                <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("targetLoad"))">Target Load (Manual) @SortIndicator("targetLoad")</button></th>
+                <th title="Each weekly target is shown once across its consecutive daily rows.">
+                    <button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("targetLoad"))">Target Load (Manual) @SortIndicator("targetLoad")</button>
+                </th>
                 <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("acwr"))">ACWR @SortIndicator("acwr")</button></th>
                 <th class="border-start"><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("sleepEfficiency"))">Sleep Efficiency (%) @SortIndicator("sleepEfficiency")</button></th>
                 <th class="border-start"><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("calories"))">Calories @SortIndicator("calories")</button></th>
@@ -369,8 +371,9 @@
             }
             else
             {
-                @foreach (var metric in SortedMetrics)
+                @foreach (var tableRow in WeeklyTargetMergedRows)
                 {
+                    var metric = tableRow.Metric;
                     <tr>
                         <td>@metric.MetricDate.ToString("ddd, MMM d")</td>
                         <td class="border-start">@Display(metric.RestingHeartRateBpm)</td>
@@ -382,7 +385,10 @@
                             @ondblclick="@(() => OpenManualLoadModalForDate(metric.MetricDate))">
                             @Display(metric.CardioLoad, "F1")
                         </td>
-                        <td>@TargetLoadText(metric.TargetLoad)</td>
+                        @if (tableRow.TargetLoadRowSpan > 0)
+                        {
+                            <td rowspan="@tableRow.TargetLoadRowSpan" class="align-middle">@TargetLoadText(metric.TargetLoad)</td>
+                        }
                         <td>@Display(metric.Acwr, "F2")</td>
                         <td class="border-start">@Display(metric.SleepEfficiency, "F2")</td>
                         <td class="border-start">@Display(metric.ConsumedCaloriesKcal)</td>
@@ -525,6 +531,9 @@
             "protein" => Sort(metrics, metric => metric.ProteinGrams),
             _ => Sort(metrics, metric => metric.MetricDate)
         };
+
+    private IEnumerable<MetricTableRow> WeeklyTargetMergedRows =>
+        MergeWeeklyTargetCells(SortedMetrics);
 
     protected override async Task OnInitializedAsync()
     {
@@ -1001,6 +1010,29 @@
         Func<DailyMetricSnapshot, T> selector) =>
         sortDescending ? source.OrderByDescending(selector) : source.OrderBy(selector);
 
+    private static IEnumerable<MetricTableRow> MergeWeeklyTargetCells(
+        IEnumerable<DailyMetricSnapshot> sortedMetrics)
+    {
+        var rows = sortedMetrics.ToList();
+        for (var index = 0; index < rows.Count;)
+        {
+            var weekStart = WeeklyLoadCalculator.GetWeekStart(rows[index].MetricDate);
+            var groupEnd = index + 1;
+            while (groupEnd < rows.Count
+                && WeeklyLoadCalculator.GetWeekStart(rows[groupEnd].MetricDate) == weekStart)
+            {
+                groupEnd++;
+            }
+
+            // Merge only contiguous rows so non-date sorts cannot span unrelated weeks.
+            yield return new MetricTableRow(rows[index], groupEnd - index);
+            for (var rowIndex = index + 1; rowIndex < groupEnd; rowIndex++)
+                yield return new MetricTableRow(rows[rowIndex], 0);
+
+            index = groupEnd;
+        }
+    }
+
     private string SortIndicator(string column) =>
         sortColumn == column ? (sortDescending ? "▼" : "▲") : string.Empty;
 
@@ -1082,4 +1114,8 @@
         public decimal? CardioLoad { get; set; }
         public decimal? TargetLoad { get; set; }
     }
+
+    private sealed record MetricTableRow(
+        DailyMetricSnapshot Metric,
+        int TargetLoadRowSpan);
 }

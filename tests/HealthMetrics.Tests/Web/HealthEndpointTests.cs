@@ -179,6 +179,17 @@ public sealed class HealthEndpointTests
     }
 
     [Fact]
+    public async Task RootDocument_MergesConsecutiveWeeklyTargetCells()
+    {
+        await using var factory = new HealthMetricsWebApplicationFactory(includeOlderMetric: true);
+        var client = factory.CreateClient();
+
+        var html = await client.GetStringAsync("/");
+
+        Assert.Matches("<td[^>]*rowspan=\"2\"[^>]*>75\\.0</td>", html);
+    }
+
+    [Fact]
     public async Task HomePage_ManualLoadEntry_UsesAccessibleModalTrigger()
     {
         await using var factory = new HealthMetricsWebApplicationFactory();

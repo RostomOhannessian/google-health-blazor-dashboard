@@ -373,6 +373,7 @@
     private readonly CancellationTokenSource _cts = new();
     private readonly List<DailyMetricSnapshot> metrics = [];
     private readonly List<DailyMetricSnapshot> loadHistory = [];
+    private readonly List<DailyMetricSnapshot> loadChartMetrics = [];
     private readonly List<SyncHistoryEntry> syncHistory = [];
     private HealthConnectionStatus? connectionStatus;
     private MetricSummary? summary;
@@ -395,7 +396,7 @@
         metrics.Any(m => m.RestingHeartRateBpm.HasValue || m.HrvRmssdMilliseconds.HasValue);
 
     private bool HasLoadMetrics =>
-        loadHistory.Any(m => m.CardioLoad.HasValue
+        loadChartMetrics.Any(m => m.CardioLoad.HasValue
             || m.TargetLoad.HasValue
             || m.Acwr.HasValue);
 
@@ -445,7 +446,7 @@
         if (chartNeedsRender && chartHasData)
         {
             chartNeedsRender = false;
-            var ordered = (chartMode == ChartMode.Load ? loadHistory : metrics)
+            var ordered = (chartMode == ChartMode.Load ? loadChartMetrics : metrics)
                 .OrderBy(m => m.MetricDate)
                 .ToList();
             if (chartMode == ChartMode.Load)
@@ -522,6 +523,8 @@
             var loadedLoadHistory = await MetricQueryService.GetAllMetricsAsync(_cts.Token);
             metrics.Clear();
             metrics.AddRange(loaded);
+            loadChartMetrics.Clear();
+            loadChartMetrics.AddRange(loaded);
             loadHistory.Clear();
             loadHistory.AddRange(loadedLoadHistory);
             if (!HasHeartMetrics && HasLoadMetrics)

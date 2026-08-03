@@ -16,11 +16,13 @@ internal sealed class MetricQueryService(HealthMetricsDbContext dbContext) : IMe
             throw new ArgumentOutOfRangeException(nameof(dayCount), "Day count must be between 1 and 365.");
         }
 
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var cutoff = today.AddDays(1 - dayCount);
+
         return await dbContext.DailyMetricSnapshots
             .AsNoTracking()
-            .Where(item => item.UserKey == LocalUser.Key)
+            .Where(item => item.UserKey == LocalUser.Key && item.MetricDate >= cutoff)
             .OrderByDescending(item => item.MetricDate)
-            .Take(dayCount)
             .ToListAsync(cancellationToken);
     }
 

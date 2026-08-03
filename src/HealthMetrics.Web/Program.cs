@@ -4,6 +4,7 @@ using System.Text;
 using HealthMetrics.Application.Interfaces;
 using HealthMetrics.Infrastructure.DependencyInjection;
 using HealthMetrics.Infrastructure.Persistence;
+using HealthMetrics.Web.Security;
 using HealthMetrics.Web.Components;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
@@ -59,6 +60,23 @@ try
         app.UseExceptionHandler("/Error", createScopeForErrors: true);
         app.UseHsts();
     }
+
+    app.Use(async (context, next) =>
+    {
+        if (LocalRequestPolicy.IsLocal(context))
+        {
+            await next();
+            return;
+        }
+
+        var remoteIp = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        startupLogger.LogWarning(
+            "Rejected non-local request for {Path} from {RemoteIpAddress}.",
+            context.Request.Path,
+            remoteIp);
+        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+        await context.Response.WriteAsync("Health Metrics only accepts localhost requests.");
+    });
 
     app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
     app.UseHttpsRedirection();
@@ -137,26 +155,6 @@ try
             return Results.Redirect("/");
         });
 
-    app.MapPost("/api/health/disconnect", async (IHealthAuthorizationService authService, CancellationToken cancellationToken) =>
-    {
-        endpointLogger.LogInformation("Google Health disconnect requested.");
-        await authService.DisconnectAsync(cancellationToken);
-        endpointLogger.LogInformation("Google Health disconnect completed.");
-        return Results.Ok();
-    }).DisableAntiforgery();
-
-    app.MapPost("/api/health/sync", async (int? days, IHealthSyncService syncService, CancellationToken cancellationToken) =>
-    {
-        var requestedDays = days is > 0 and <= 90 ? days.Value : 7;
-        endpointLogger.LogInformation("Manual Google Health sync requested for {RequestedDays} day(s).", requestedDays);
-        var result = await syncService.SyncRecentDaysAsync(requestedDays, cancellationToken);
-        endpointLogger.LogInformation(
-            "Manual Google Health sync completed. Persisted {PersistedDays}/{RequestedDays} day(s).",
-            result.PersistedDays,
-            result.RequestedDays);
-        return Results.Ok(result);
-    }).DisableAntiforgery();
-
     app.MapGet("/api/metrics", async (int? days, IMetricQueryService metricQueryService, CancellationToken cancellationToken) =>
     {
         var requestedDays = days is > 0 and <= 365 ? days.Value : 30;
@@ -186,15 +184,6 @@ try
             filename);
         return Results.File(Encoding.UTF8.GetBytes(sb.ToString()), "text/csv", filename);
     });
-
-    app.MapPost("/api/demo/seed", async (int? days, IDemoSeedService demoSeedService, CancellationToken cancellationToken) =>
-    {
-        var dayCount = days is > 0 and <= 90 ? days.Value : 30;
-        endpointLogger.LogInformation("Demo seed requested for {RequestedDays} day(s).", dayCount);
-        var inserted = await demoSeedService.SeedAsync(dayCount, cancellationToken);
-        endpointLogger.LogInformation("Demo seed completed. Inserted {InsertedDays}/{RequestedDays} day(s).", inserted, dayCount);
-        return Results.Ok(new { Inserted = inserted, Requested = dayCount });
-    }).DisableAntiforgery();
 
     app.Run();
 }

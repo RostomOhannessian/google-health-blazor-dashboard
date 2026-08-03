@@ -47,6 +47,28 @@ public sealed class MetricQueryServiceTests
         Assert.Equal([4, 3, 2], results.Select(entry => entry.RequestedDays));
     }
 
+    [Fact]
+    public async Task RecentMetrics_FiltersByCalendarRangeInsteadOfLastRowCount()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        await using var db = CreateDbContext(connection);
+        await db.Database.EnsureCreatedAsync();
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        db.DailyMetricSnapshots.AddRange(
+            new DailyMetricSnapshot { UserKey = LocalUser.Key, MetricDate = today, RestingHeartRateBpm = 50 },
+            new DailyMetricSnapshot { UserKey = LocalUser.Key, MetricDate = today.AddDays(-2), RestingHeartRateBpm = 52 },
+            new DailyMetricSnapshot { UserKey = LocalUser.Key, MetricDate = today.AddDays(-10), RestingHeartRateBpm = 57 },
+            new DailyMetricSnapshot { UserKey = "another-user", MetricDate = today.AddDays(-1), RestingHeartRateBpm = 61 });
+        await db.SaveChangesAsync();
+
+        var results = await new MetricQueryService(db).GetRecentMetricsAsync(7);
+
+        Assert.Equal([today, today.AddDays(-2)], results.Select(metric => metric.MetricDate));
+        Assert.All(results, metric => Assert.Equal(LocalUser.Key, metric.UserKey));
+    }
+
     private static HealthMetricsDbContext CreateDbContext(SqliteConnection connection) =>
         new(new DbContextOptionsBuilder<HealthMetricsDbContext>()
             .UseSqlite(connection)

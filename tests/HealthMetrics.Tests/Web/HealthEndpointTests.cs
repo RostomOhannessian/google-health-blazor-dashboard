@@ -2,6 +2,8 @@ using System.Net;
 using HealthMetrics.Application.Interfaces;
 using HealthMetrics.Application.Models;
 using HealthMetrics.Infrastructure.Persistence;
+using HealthMetrics.Web.Security;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
@@ -212,6 +214,41 @@ public sealed class HealthEndpointTests
         Assert.Contains("Manual ACWR", script);
         Assert.Contains("AZM ACWR", script);
         Assert.Contains("yAcwr", script);
+    }
+
+    [Theory]
+    [InlineData("127.0.0.1", true)]
+    [InlineData("::1", true)]
+    [InlineData("::ffff:127.0.0.1", true)]
+    [InlineData("192.168.1.10", false)]
+    public void LocalRequestPolicy_RecognizesLoopbackAddresses(string remoteIpAddress, bool expected)
+    {
+        var context = new DefaultHttpContext();
+        context.Connection.RemoteIpAddress = IPAddress.Parse(remoteIpAddress);
+
+        Assert.Equal(expected, LocalRequestPolicy.IsLocal(context));
+    }
+
+    [Fact]
+    public void LocalRequestPolicy_AllowsInMemoryRequestsWithoutRemoteIp()
+    {
+        var context = new DefaultHttpContext();
+
+        Assert.True(LocalRequestPolicy.IsLocal(context));
+    }
+
+    [Theory]
+    [InlineData("/api/health/disconnect")]
+    [InlineData("/api/health/sync?days=7")]
+    [InlineData("/api/demo/seed?days=30")]
+    public async Task LegacyMutationEndpoints_DoNotAcceptBrowserPostsWithoutAntiforgery(string path)
+    {
+        await using var factory = new HealthMetricsWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var response = await client.PostAsync(path, content: null);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     private sealed class HealthMetricsWebApplicationFactory : WebApplicationFactory<Program>

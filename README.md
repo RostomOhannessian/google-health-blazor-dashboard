@@ -44,7 +44,8 @@ dotnet run --project .\src\HealthMetrics.Web\HealthMetrics.Web.csproj --launch-p
 ```
 
 Then open `https://localhost:5001`. The HTTP companion is `http://localhost:5000`
-and redirects to HTTPS.
+and redirects to HTTPS. The app rejects non-loopback requests at runtime because
+it is a single-user local dashboard.
 
 ## Test
 

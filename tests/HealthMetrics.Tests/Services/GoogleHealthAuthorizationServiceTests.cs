@@ -204,6 +204,54 @@ public sealed class GoogleHealthAuthorizationServiceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task HandleAuthorizationCodeAsync_WhenTokenScopeMissing_PreservesExistingScope()
+    {
+        var protector = _dp.CreateProtector("HealthMetrics.GoogleTokens.v1");
+        _dbContext.HealthConnections.Add(new HealthConnection
+        {
+            GoogleUserId = "old-user",
+            AccessToken = protector.Protect("old-at"),
+            RefreshToken = protector.Protect("old-rt"),
+            Scope = $"openid {SleepReadScope}",
+            AccessTokenExpiresAtUtc = DateTimeOffset.UtcNow.AddHours(1)
+        });
+        await _dbContext.SaveChangesAsync();
+
+        var fakeAdapter = new FakeGoogleAuthAdapter(
+            exchangeResponse: new TokenResponse
+            {
+                AccessToken = "new-at",
+                RefreshToken = "new-rt",
+                ExpiresInSeconds = 3600,
+                Scope = null
+            });
+
+        await CreateService(fakeAdapter).HandleAuthorizationCodeAsync("code");
+
+        var conn = await _dbContext.HealthConnections.SingleAsync();
+        Assert.Equal($"openid {SleepReadScope}", conn.Scope);
+    }
+
+    [Fact]
+    public async Task HandleAuthorizationCodeAsync_WhenTokenScopeMissingForNewConnection_UsesConfiguredScopes()
+    {
+        var fakeAdapter = new FakeGoogleAuthAdapter(
+            exchangeResponse: new TokenResponse
+            {
+                AccessToken = "new-at",
+                RefreshToken = "new-rt",
+                ExpiresInSeconds = 3600,
+                Scope = null
+            });
+
+        var configuredScopes = new[] { "openid", "email", SleepReadScope };
+        await CreateService(fakeAdapter, scopes: configuredScopes).HandleAuthorizationCodeAsync("code");
+
+        var conn = await _dbContext.HealthConnections.SingleAsync();
+        Assert.Equal(string.Join(' ', configuredScopes), conn.Scope);
+    }
+
+    [Fact]
     public async Task HandleAuthorizationCodeAsync_MissingRefreshToken_Throws()
     {
         var fakeAdapter = new FakeGoogleAuthAdapter(
@@ -266,12 +314,51 @@ public sealed class GoogleHealthAuthorizationServiceTests : IAsyncLifetime
         Assert.Equal(0, await _dbContext.HealthConnections.CountAsync());
     }
 
+    [Fact]
+    public async Task DisconnectAsync_WhenStoredRefreshTokenCannotBeDecrypted_StillRemovesRow()
+    {
+        var foreignProtector = new EphemeralDataProtectionProvider()
+            .CreateProtector("HealthMetrics.GoogleTokens.v1");
+        _dbContext.HealthConnections.Add(new HealthConnection
+        {
+            GoogleUserId = "user-123",
+            AccessToken = foreignProtector.Protect("at"),
+            RefreshToken = foreignProtector.Protect("rt"),
+            Scope = "openid",
+            AccessTokenExpiresAtUtc = DateTimeOffset.UtcNow.AddHours(1)
+        });
+        await _dbContext.SaveChangesAsync();
+
+        await CreateService().DisconnectAsync();
+
+        Assert.Equal(0, await _dbContext.HealthConnections.CountAsync());
+    }
+
+    [Fact]
+    public async Task GetValidAccessTokenAsync_WhenStoredAccessTokenCannotBeDecrypted_ThrowsInvalidOperationException()
+    {
+        var foreignProtector = new EphemeralDataProtectionProvider()
+            .CreateProtector("HealthMetrics.GoogleTokens.v1");
+        _dbContext.HealthConnections.Add(new HealthConnection
+        {
+            GoogleUserId = "user-123",
+            AccessToken = foreignProtector.Protect("at"),
+            RefreshToken = foreignProtector.Protect("rt"),
+            Scope = "openid",
+            AccessTokenExpiresAtUtc = DateTimeOffset.UtcNow.AddHours(1)
+        });
+        await _dbContext.SaveChangesAsync();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => CreateService().GetValidAccessTokenAsync());
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     private GoogleHealthAuthorizationService CreateService(
         FakeGoogleAuthAdapter? adapter = null,
         string? googleUserId = null,
-        string? googleEmail = null)
+        string? googleEmail = null,
+        string[]? scopes = null)
     {
         adapter ??= new FakeGoogleAuthAdapter();
 
@@ -302,6 +389,13 @@ public sealed class GoogleHealthAuthorizationServiceTests : IAsyncLifetime
         {
             BaseAddress = new Uri("https://openidconnect.googleapis.com/")
         });
+        var options = Options.Create(new GoogleHealthApiOptions
+        {
+            ClientId = "client-id",
+            ClientSecret = "client-secret",
+            RedirectUri = "https://localhost/callback",
+            Scopes = scopes ?? ["openid", "email", SleepReadScope]
+        });
 
         return new GoogleHealthAuthorizationService(
             _dbContext,
@@ -309,6 +403,7 @@ public sealed class GoogleHealthAuthorizationServiceTests : IAsyncLifetime
             accountClient,
             adapter,
             _dp,
+            options,
             NullLogger<GoogleHealthAuthorizationService>.Instance);
     }
 

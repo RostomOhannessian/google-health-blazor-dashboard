@@ -5,8 +5,10 @@ using HealthMetrics.Infrastructure.Clients;
 using HealthMetrics.Infrastructure.Options;
 using HealthMetrics.Infrastructure.Persistence;
 using Microsoft.AspNetCore.DataProtection;
+using System.Security.Cryptography;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace HealthMetrics.Infrastructure.Services;
 
@@ -16,10 +18,12 @@ internal sealed class GoogleHealthAuthorizationService(
     GoogleAccountApiClient googleAccountApiClient,
     IGoogleAuthAdapter authAdapter,
     IDataProtectionProvider dataProtectionProvider,
+    IOptions<GoogleHealthApiOptions> googleHealthApiOptions,
     ILogger<GoogleHealthAuthorizationService> logger) : IHealthAuthorizationService
 {
     private readonly IDataProtector _tokenProtector =
         dataProtectionProvider.CreateProtector("HealthMetrics.GoogleTokens.v1");
+    private readonly string _configuredScopes = string.Join(' ', googleHealthApiOptions.Value.Scopes);
 
     public Task<Uri> BuildAuthorizationUriAsync(string state, CancellationToken cancellationToken = default)
     {
@@ -51,7 +55,8 @@ internal sealed class GoogleHealthAuthorizationService(
             .SingleOrDefaultAsync(item => item.UserKey == LocalUser.Key, cancellationToken);
         var isNewConnection = connection is null;
 
-        var scopeCount = NormalizeScope(token.Scope)
+        var normalizedScope = NormalizeScope(token.Scope, connection?.Scope, _configuredScopes);
+        var scopeCount = normalizedScope
             .Split(' ', StringSplitOptions.RemoveEmptyEntries).Length;
 
         if (connection is null)
@@ -63,7 +68,7 @@ internal sealed class GoogleHealthAuthorizationService(
                 GoogleEmail = googleEmail,
                 AccessToken = _tokenProtector.Protect(token.AccessToken),
                 RefreshToken = _tokenProtector.Protect(token.RefreshToken),
-                Scope = NormalizeScope(token.Scope),
+                Scope = normalizedScope,
                 AccessTokenExpiresAtUtc = CalculateExpiry(token),
                 RefreshTokenExpiresAtUtc = CalculateRefreshTokenExpiry(token),
                 CreatedAtUtc = DateTimeOffset.UtcNow,
@@ -78,7 +83,7 @@ internal sealed class GoogleHealthAuthorizationService(
             connection.GoogleEmail = googleEmail;
             connection.AccessToken = _tokenProtector.Protect(token.AccessToken);
             connection.RefreshToken = _tokenProtector.Protect(token.RefreshToken);
-            connection.Scope = NormalizeScope(token.Scope);
+            connection.Scope = normalizedScope;
             connection.AccessTokenExpiresAtUtc = CalculateExpiry(token);
             connection.RefreshTokenExpiresAtUtc = CalculateRefreshTokenExpiry(token);
             connection.UpdatedAtUtc = DateTimeOffset.UtcNow;
@@ -102,11 +107,20 @@ internal sealed class GoogleHealthAuthorizationService(
         if (connection.AccessTokenExpiresAtUtc <= DateTimeOffset.UtcNow.AddMinutes(2))
         {
             logger.LogInformation("Google Health access token refresh started. AccessTokenExpiresAtUtc: {AccessTokenExpiresAtUtc}.", connection.AccessTokenExpiresAtUtc);
-            var refreshToken = _tokenProtector.Unprotect(connection.RefreshToken);
+            string refreshToken;
+            try
+            {
+                refreshToken = _tokenProtector.Unprotect(connection.RefreshToken);
+            }
+            catch (CryptographicException ex)
+            {
+                throw new InvalidOperationException("Stored Google OAuth refresh token could not be decrypted. Reconnect Google Health.", ex);
+            }
+
             TokenResponse token;
             try
             {
-            token = await authAdapter.RefreshTokenAsync(refreshToken, cancellationToken);
+                token = await authAdapter.RefreshTokenAsync(refreshToken, cancellationToken);
             }
             catch (TokenResponseException ex)
             {
@@ -133,7 +147,14 @@ internal sealed class GoogleHealthAuthorizationService(
                 connection.RefreshTokenExpiresAtUtc);
         }
 
-        return _tokenProtector.Unprotect(connection.AccessToken);
+        try
+        {
+            return _tokenProtector.Unprotect(connection.AccessToken);
+        }
+        catch (CryptographicException ex)
+        {
+            throw new InvalidOperationException("Stored Google OAuth access token could not be decrypted. Reconnect Google Health.", ex);
+        }
     }
 
     public async Task<HealthConnectionStatus> GetConnectionStatusAsync(CancellationToken cancellationToken = default)
@@ -166,15 +187,27 @@ internal sealed class GoogleHealthAuthorizationService(
         }
 
         logger.LogInformation("Google Health disconnect started.");
-        var refreshToken = _tokenProtector.Unprotect(connection.RefreshToken);
+        string? refreshToken = null;
         try
         {
-            await authAdapter.RevokeTokenAsync(refreshToken, cancellationToken);
-            logger.LogInformation("Google Health remote token revocation succeeded.");
+            refreshToken = _tokenProtector.Unprotect(connection.RefreshToken);
         }
-        catch (Exception ex)
+        catch (CryptographicException ex)
         {
-            logger.LogWarning(ex, "Google Health remote token revocation failed; local disconnect will continue.");
+            logger.LogWarning(ex, "Google Health refresh token could not be decrypted during disconnect; local cleanup will continue.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(refreshToken))
+        {
+            try
+            {
+                await authAdapter.RevokeTokenAsync(refreshToken, cancellationToken);
+                logger.LogInformation("Google Health remote token revocation succeeded.");
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Google Health remote token revocation failed; local disconnect will continue.");
+            }
         }
 
         dbContext.HealthConnections.Remove(connection);
@@ -200,6 +233,17 @@ internal sealed class GoogleHealthAuthorizationService(
         return DateTimeOffset.UtcNow.AddSeconds(seconds);
     }
 
-    private static string NormalizeScope(string? scope, string? fallback = null)
-        => string.IsNullOrWhiteSpace(scope) ? fallback ?? string.Empty : scope;
+    private static string NormalizeScope(string? scope, params string?[] fallbacks)
+    {
+        if (!string.IsNullOrWhiteSpace(scope))
+            return scope;
+
+        foreach (var fallback in fallbacks)
+        {
+            if (!string.IsNullOrWhiteSpace(fallback))
+                return fallback;
+        }
+
+        return string.Empty;
+    }
 }

@@ -283,11 +283,11 @@ public sealed class HealthEndpointTests
     }
 
     [Fact]
-    public void LocalRequestPolicy_AllowsInMemoryRequestsWithoutRemoteIp()
+    public void LocalRequestPolicy_RejectsRequestsWithoutRemoteIp()
     {
         var context = new DefaultHttpContext();
 
-        Assert.True(LocalRequestPolicy.IsLocal(context));
+        Assert.False(LocalRequestPolicy.IsLocal(context));
     }
 
     [Theory]

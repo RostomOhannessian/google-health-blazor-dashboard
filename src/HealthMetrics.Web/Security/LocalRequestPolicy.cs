@@ -12,7 +12,7 @@ internal static class LocalRequestPolicy
         var remoteIp = context.Connection.RemoteIpAddress;
         if (remoteIp is null)
         {
-            return true;
+            return false;
         }
 
         if (remoteIp.IsIPv4MappedToIPv6)

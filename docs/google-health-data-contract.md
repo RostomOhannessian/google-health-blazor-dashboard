@@ -27,6 +27,9 @@ contract and the locally persisted fields that accompany it.
   rounded-up complete Monday-Sunday weeks and append completed days from the
   current week. Year-to-date runs from January 1 through the latest completed
   UTC day.
+- The selected range is used unchanged for sync and export. The dashboard table
+  and charts hide only historical partial weeks at range boundaries while
+  retaining the current in-progress week.
 - The automatic daily sync remains configurable from 1-90 days.
 - Google Health daily rollups use closed-open civil-date ranges aligned to the requested days.
 - Rollup requests are chunked in 14-day windows to stay inside stricter Google Health range limits for affected data types.

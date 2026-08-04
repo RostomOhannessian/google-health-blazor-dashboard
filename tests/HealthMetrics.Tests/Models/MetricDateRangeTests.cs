@@ -66,4 +66,16 @@ public sealed class MetricDateRangeTests
         Assert.Equal(new DateOnly(2026, 8, 3), range.EndDate);
         Assert.Equal(215, range.DayCount);
     }
+
+    [Fact]
+    public void IncludesWeekForDisplay_ExcludesHistoricalPartialWeeksAndKeepsCurrentWeek()
+    {
+        var range = MetricDateRange.ForYearToDate(new DateOnly(2026, 8, 4));
+        var today = new DateOnly(2026, 8, 4);
+
+        Assert.False(range.IncludesWeekForDisplay(new DateOnly(2025, 12, 29), today));
+        Assert.True(range.IncludesWeekForDisplay(new DateOnly(2026, 1, 5), today));
+        Assert.True(range.IncludesWeekForDisplay(new DateOnly(2026, 7, 27), today));
+        Assert.True(range.IncludesWeekForDisplay(new DateOnly(2026, 8, 3), today));
+    }
 }

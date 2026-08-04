@@ -244,7 +244,8 @@ depends on the account, connected devices, source apps, date range, and granted
 scopes; missing values are not automatically an application error.
 The dashboard includes every completed UTC day through yesterday, so a Monday
 record is available on Tuesday even though its Monday-Sunday week is not yet
-complete.
+complete. Sync uses the full selected range; the table and charts hide only
+historical partial weeks and retain the current in-progress week.
 
 ### Demo data and export
 

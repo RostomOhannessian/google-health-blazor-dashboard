@@ -4,6 +4,15 @@ public sealed record MetricDateRange(DateOnly StartDate, DateOnly EndDate)
 {
     public int DayCount => EndDate.DayNumber - StartDate.DayNumber + 1;
 
+    public bool ContainsCompleteWeek(DateOnly weekStart) =>
+        weekStart >= StartDate && weekStart.DayNumber + 6 <= EndDate.DayNumber;
+
+    public bool IncludesWeekForDisplay(DateOnly weekStart, DateOnly today) =>
+        ContainsCompleteWeek(weekStart)
+        || (weekStart == WeeklyLoadCalculator.GetWeekStart(today)
+            && weekStart <= EndDate
+            && weekStart.DayNumber + 6 >= StartDate.DayNumber);
+
     public static MetricDateRange ForRecentFullWeeks(int requestedDays, DateOnly today)
     {
         if (requestedDays <= 0)

@@ -355,13 +355,18 @@
            class="small text-decoration-none"
            download>⬇ Export CSV</a>
         <small class="text-muted">
-            @metrics.Count of @SelectedDayCount days through @SelectedDateRange.EndDate.ToString("MMM d", CultureInfo.CurrentCulture) · — = not recorded for that date
+            @displayMetrics.Count of @SelectedDayCount days through @SelectedDateRange.EndDate.ToString("MMM d", CultureInfo.CurrentCulture)
+            @if (displayMetrics.Count < metrics.Count)
+            {
+                <span> · historical partial weeks are hidden</span>
+            }
+            <span> · — = not recorded for that date</span>
         </small>
     </div>
 </div>
 <div class="table-responsive">
     <table class="table table-striped table-sm table-hover">
-        @if (metrics.Count > 0 && !ShowsWeeklySummaries)
+        @if (displayMetrics.Count > 0 && !ShowsWeeklySummaries)
         {
             <caption class="caption-top py-1 text-muted">
                 Weekly summaries are shown when sorted by date.
@@ -389,13 +394,15 @@
             </tr>
         </thead>
         <tbody>
-            @if (metrics.Count == 0)
+            @if (displayMetrics.Count == 0)
             {
                 <tr>
                     <td colspan="13" class="text-center text-muted py-3">
-                        @(connectionStatus?.IsConnected == true
-                            ? "No data for this range — run a sync first."
-                            : "Connect Google Health and run sync to start tracking.")
+                        @(metrics.Count > 0
+                            ? "No complete historical week or current-week data is available for this range."
+                            : connectionStatus?.IsConnected == true
+                                ? "No data for this range — run a sync first."
+                                : "Connect Google Health and run sync to start tracking.")
                     </td>
                 </tr>
             }
@@ -513,6 +520,7 @@
 
     private readonly CancellationTokenSource _cts = new();
     private readonly List<DailyMetricSnapshot> metrics = [];
+    private readonly List<DailyMetricSnapshot> displayMetrics = [];
     private readonly List<DailyMetricSnapshot> loadHistory = [];
     private readonly List<DailyMetricSnapshot> loadChartMetrics = [];
     private readonly List<SyncHistoryEntry> syncHistory = [];
@@ -550,7 +558,7 @@
     }
 
     private bool HasHeartMetrics =>
-        metrics.Any(m => m.RestingHeartRateBpm.HasValue || m.HrvRmssdMilliseconds.HasValue);
+        displayMetrics.Any(m => m.RestingHeartRateBpm.HasValue || m.HrvRmssdMilliseconds.HasValue);
 
     private bool HasLoadMetrics =>
         loadChartMetrics.Any(m => m.CardioLoad.HasValue
@@ -560,11 +568,14 @@
     private bool IsYearToDate => selectedRange == MetricRange.YearToDate;
 
     private MetricDateRange SelectedDateRange =>
+        GetSelectedDateRange(DateOnly.FromDateTime(DateTime.UtcNow));
+
+    private MetricDateRange GetSelectedDateRange(DateOnly today) =>
         IsYearToDate
-            ? MetricDateRange.ForYearToDate(DateOnly.FromDateTime(DateTime.UtcNow))
+            ? MetricDateRange.ForYearToDate(today)
             : MetricDateRange.ForRecentFullWeeksThroughLastCompletedDay(
                 (int)selectedRange,
-                DateOnly.FromDateTime(DateTime.UtcNow));
+                today);
 
     private int SelectedDayCount =>
         SelectedDateRange.DayCount;
@@ -577,19 +588,19 @@
     private IEnumerable<DailyMetricSnapshot> SortedMetrics =>
         sortColumn switch
         {
-            "restingHr" => Sort(metrics, metric => metric.RestingHeartRateBpm),
-            "hrv" => Sort(metrics, metric => metric.HrvRmssdMilliseconds),
-            "dailyVo2" => Sort(metrics, metric => metric.DailyVo2MaxMlKgMin),
-            "runVo2" => Sort(metrics, metric => metric.RunVo2MaxMlKgMin),
-            "cardioLoad" => Sort(metrics, metric => metric.CardioLoad),
-            "targetLoad" => Sort(metrics, metric => metric.TargetLoad),
-            "acwr" => Sort(metrics, metric => metric.Acwr),
-            "sleepEfficiency" => Sort(metrics, metric => metric.SleepEfficiency),
-            "calories" => Sort(metrics, metric => metric.ConsumedCaloriesKcal),
-            "carbs" => Sort(metrics, metric => metric.CarbohydratesGrams),
-            "fat" => Sort(metrics, metric => metric.FatGrams),
-            "protein" => Sort(metrics, metric => metric.ProteinGrams),
-            _ => Sort(metrics, metric => metric.MetricDate)
+            "restingHr" => Sort(displayMetrics, metric => metric.RestingHeartRateBpm),
+            "hrv" => Sort(displayMetrics, metric => metric.HrvRmssdMilliseconds),
+            "dailyVo2" => Sort(displayMetrics, metric => metric.DailyVo2MaxMlKgMin),
+            "runVo2" => Sort(displayMetrics, metric => metric.RunVo2MaxMlKgMin),
+            "cardioLoad" => Sort(displayMetrics, metric => metric.CardioLoad),
+            "targetLoad" => Sort(displayMetrics, metric => metric.TargetLoad),
+            "acwr" => Sort(displayMetrics, metric => metric.Acwr),
+            "sleepEfficiency" => Sort(displayMetrics, metric => metric.SleepEfficiency),
+            "calories" => Sort(displayMetrics, metric => metric.ConsumedCaloriesKcal),
+            "carbs" => Sort(displayMetrics, metric => metric.CarbohydratesGrams),
+            "fat" => Sort(displayMetrics, metric => metric.FatGrams),
+            "protein" => Sort(displayMetrics, metric => metric.ProteinGrams),
+            _ => Sort(displayMetrics, metric => metric.MetricDate)
         };
 
     private IEnumerable<WeeklyMetricGroup> WeeklyMetricGroups =>
@@ -599,7 +610,7 @@
 
     private bool ShouldShowWeeklySummary(WeeklyMetricGroup weeklyGroup) =>
         ShowsWeeklySummaries
-        && weeklyGroup.WeekStart.AddDays(6) <= SelectedDateRange.EndDate;
+        && SelectedDateRange.ContainsCompleteWeek(weeklyGroup.WeekStart);
 
     protected override async Task OnInitializedAsync()
     {
@@ -619,7 +630,7 @@
         if (chartNeedsRender && chartHasData)
         {
             chartNeedsRender = false;
-            var ordered = (chartMode == ChartMode.Load ? loadChartMetrics : metrics)
+            var ordered = (chartMode == ChartMode.Load ? loadChartMetrics : displayMetrics)
                 .OrderBy(m => m.MetricDate)
                 .ToList();
             if (chartMode == ChartMode.Load)
@@ -721,17 +732,25 @@
         try
         {
             var authError = lastError;
-            var dateRange = SelectedDateRange;
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var dateRange = GetSelectedDateRange(today);
             connectionStatus = await OAuthService.GetConnectionStatusAsync(_cts.Token);
             var loaded = await MetricQueryService.GetMetricsAsync(
                 dateRange.StartDate,
                 dateRange.EndDate,
                 _cts.Token);
+            var displayed = loaded
+                .Where(metric => dateRange.IncludesWeekForDisplay(
+                    WeeklyLoadCalculator.GetWeekStart(metric.MetricDate),
+                    today))
+                .ToList();
             var loadedLoadHistory = await MetricQueryService.GetAllMetricsAsync(_cts.Token);
             metrics.Clear();
             metrics.AddRange(loaded);
+            displayMetrics.Clear();
+            displayMetrics.AddRange(displayed);
             loadChartMetrics.Clear();
-            loadChartMetrics.AddRange(loaded);
+            loadChartMetrics.AddRange(displayed);
             loadHistory.Clear();
             loadHistory.AddRange(loadedLoadHistory);
             if (!HasHeartMetrics && HasLoadMetrics)

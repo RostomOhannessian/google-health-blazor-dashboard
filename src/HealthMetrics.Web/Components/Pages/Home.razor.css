@@ -71,6 +71,9 @@
     max-width: 100%;
     overflow: auto;
     overscroll-behavior: contain;
+    border: var(--bs-border-width) solid var(--bs-border-color);
+    border-radius: var(--bs-border-radius);
+    background-color: var(--bs-body-bg);
 }
 
 .daily-snapshots-scroll table {
@@ -81,8 +84,9 @@
 .daily-snapshots-scroll thead th {
     position: sticky;
     top: 0;
-    z-index: 2;
+    z-index: 3;
     background-color: var(--bs-body-bg);
+    background-clip: padding-box;
     box-shadow: inset 0 -1px var(--bs-border-color);
 }
 

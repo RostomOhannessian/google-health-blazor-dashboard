@@ -183,6 +183,9 @@ public sealed class HealthEndpointTests
         Assert.Contains("height: 520px", stylesheetContent);
         Assert.Contains(".daily-snapshots-scroll", stylesheetContent);
         Assert.Contains("height: 68rem", stylesheetContent);
+        Assert.Contains("border: var(--bs-border-width) solid var(--bs-border-color)", stylesheetContent);
+        Assert.Contains("border-radius: var(--bs-border-radius)", stylesheetContent);
+        Assert.Contains("position: sticky", stylesheetContent);
     }
 
     [Fact]

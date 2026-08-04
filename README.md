@@ -19,6 +19,23 @@ chronic windows.
 See the [Google Health data contract](docs/google-health-data-contract.md) for
 payload mappings and the CSV field contract.
 
+## Built end-to-end with AI-assisted development
+
+This is an end-to-end vibe-coded project. GitHub Copilot was used as a hands-on
+engineering collaborator from product shaping through implementation, debugging,
+testing, documentation, and iterative UX refinement. The work remained
+human-directed: product requirements, architectural boundaries, tradeoffs, code
+review, and acceptance decisions were made deliberately rather than delegated.
+
+For recruiters and engineers evaluating the project, useful places to start are:
+
+- [Architecture](docs/architecture.md) for the application boundaries and data flows.
+- [Google Health data contract](docs/google-health-data-contract.md) for provider
+  normalization and the exported CSV schema.
+- [Local development](docs/local-development.md) for setup, operational details,
+  and troubleshooting.
+- `tests/HealthMetrics.Tests` for unit, persistence, client, and endpoint coverage.
+
 ## Start here
 
 1. Install the .NET 10 SDK and trust the HTTPS development certificate.

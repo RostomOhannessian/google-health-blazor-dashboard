@@ -66,14 +66,23 @@
     height: 1px;
 }
 
-.daily-snapshots-scroll {
-    height: 68rem;
-    max-width: 100%;
-    overflow: auto;
-    overscroll-behavior: contain;
+.daily-snapshots-panel {
     border: var(--bs-border-width) solid var(--bs-border-color);
     border-radius: var(--bs-border-radius);
     background-color: var(--bs-body-bg);
+    overflow: hidden;
+}
+
+.daily-snapshots-heading {
+    padding: 0.75rem 1rem;
+    border-bottom: var(--bs-border-width) solid var(--bs-border-color);
+}
+
+.daily-snapshots-scroll {
+    height: 31rem;
+    max-width: 100%;
+    overflow: auto;
+    overscroll-behavior: contain;
 }
 
 .daily-snapshots-scroll table {

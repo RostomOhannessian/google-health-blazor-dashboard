@@ -150,6 +150,7 @@ public sealed class HealthEndpointTests
         Assert.Equal(expectedRange.EndDate, queryService.LastEndDate);
         Assert.Contains("Sync last 30 days", html);
         Assert.Contains("weekly-summaries-toggle", html);
+        Assert.Contains("daily-snapshots-panel", html);
         Assert.Contains("dailySnapshotsScroll", html);
         Assert.Contains("Scroll chart history horizontally", html);
         Assert.Contains("Scroll daily snapshot history", html);
@@ -181,8 +182,9 @@ public sealed class HealthEndpointTests
         Assert.Contains(".page[", stylesheetContent);
         Assert.Contains(".chart-plot", stylesheetContent);
         Assert.Contains("height: 520px", stylesheetContent);
+        Assert.Contains(".daily-snapshots-panel", stylesheetContent);
         Assert.Contains(".daily-snapshots-scroll", stylesheetContent);
-        Assert.Contains("height: 68rem", stylesheetContent);
+        Assert.Contains("height: 31rem", stylesheetContent);
         Assert.Contains("border: var(--bs-border-width) solid var(--bs-border-color)", stylesheetContent);
         Assert.Contains("border-radius: var(--bs-border-radius)", stylesheetContent);
         Assert.Contains("position: sticky", stylesheetContent);

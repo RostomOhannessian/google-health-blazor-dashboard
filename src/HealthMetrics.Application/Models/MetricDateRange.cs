@@ -4,47 +4,19 @@ public sealed record MetricDateRange(DateOnly StartDate, DateOnly EndDate)
 {
     public int DayCount => EndDate.DayNumber - StartDate.DayNumber + 1;
 
-    public bool ContainsCompleteWeek(DateOnly weekStart) =>
-        weekStart >= StartDate && weekStart.DayNumber + 6 <= EndDate.DayNumber;
-
-    public bool IncludesWeekForDisplay(DateOnly weekStart, DateOnly today) =>
-        ContainsCompleteWeek(weekStart)
-        || (weekStart == WeeklyLoadCalculator.GetWeekStart(today)
-            && weekStart <= EndDate
-            && weekStart.DayNumber + 6 >= StartDate.DayNumber);
-
-    public static MetricDateRange ForRecentFullWeeks(int requestedDays, DateOnly today)
+    public static MetricDateRange ForRecentDays(int requestedDays, DateOnly endDate)
     {
         if (requestedDays <= 0)
             throw new ArgumentOutOfRangeException(nameof(requestedDays), "Requested days must be greater than zero.");
 
-        var weekCount = (requestedDays + 6) / 7;
-        var endDate = GetLastCompletedWeekEnd(today);
-        return new MetricDateRange(endDate.AddDays(-(weekCount * 7 - 1)), endDate);
+        if (endDate.DayNumber < requestedDays - 1)
+            throw new ArgumentOutOfRangeException(nameof(endDate), "The requested range cannot begin before January 1, 0001.");
+
+        return new MetricDateRange(endDate.AddDays(1 - requestedDays), endDate);
     }
 
-    public static MetricDateRange ForRecentFullWeeksThroughLastCompletedDay(int requestedDays, DateOnly today)
+    public static MetricDateRange ForYearToDate(DateOnly endDate)
     {
-        if (requestedDays <= 0)
-            throw new ArgumentOutOfRangeException(nameof(requestedDays), "Requested days must be greater than zero.");
-
-        if (today == DateOnly.MinValue)
-            throw new ArgumentOutOfRangeException(nameof(today), "Today must have a preceding completed day.");
-
-        var lastCompletedDay = today.AddDays(-1);
-        var completeWeeks = ForRecentFullWeeks(requestedDays, lastCompletedDay);
-        return completeWeeks with { EndDate = lastCompletedDay };
+        return new MetricDateRange(new DateOnly(endDate.Year, 1, 1), endDate);
     }
-
-    public static MetricDateRange ForYearToDate(DateOnly today)
-    {
-        var startDate = new DateOnly(today.Year, 1, 1);
-        // Keep the first day of a year queryable even though it has not completed yet.
-        var endDate = today == startDate ? startDate : today.AddDays(-1);
-
-        return new MetricDateRange(startDate, endDate);
-    }
-
-    private static DateOnly GetLastCompletedWeekEnd(DateOnly today) =>
-        today.AddDays(-(int)today.DayOfWeek);
 }

@@ -53,6 +53,26 @@ public sealed class GoogleHealthSyncServiceTests : IAsyncLifetime
         Assert.Equal(366, result.PersistedDays);
     }
 
+    [Theory]
+    [InlineData(7)]
+    [InlineData(30)]
+    [InlineData(90)]
+    public async Task SyncRecentDaysAsync_PersistsExactInclusiveRequestedRange(int dayCount)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        var result = await CreateService().SyncRecentDaysAsync(dayCount);
+        var snapshots = await _dbContext.DailyMetricSnapshots
+            .OrderBy(snapshot => snapshot.MetricDate)
+            .ToListAsync();
+
+        Assert.Equal(dayCount, result.RequestedDays);
+        Assert.Equal(dayCount, result.PersistedDays);
+        Assert.Equal(dayCount, snapshots.Count);
+        Assert.Equal(today.AddDays(1 - dayCount), snapshots.First().MetricDate);
+        Assert.Equal(today, snapshots.Last().MetricDate);
+    }
+
     // ── Merge: null fields from a re-sync must not overwrite stored values ───
 
     [Fact]

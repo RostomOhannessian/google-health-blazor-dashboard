@@ -42,11 +42,13 @@ tools and operating model, not C# syntax or IDE navigation.
   cards, buttons, tables, accessibility states, and Bootstrap light/dark
   variables.
 * **Chart.js**: the dashboard's `wwwroot/charts.js` creates the Heart & HRV and
-  Manual Load & Training Strain views through JavaScript interop. The load view
-  renders Monday-starting weekly Cardio Load totals across the full local
-  history, a weekly target line, and the latest weekly ACWR. The table range
-  buttons do not limit the Load chart; both views recolor axes, grids, legends,
-  and tooltips when the theme changes.
+  Manual Load & Training Strain views through JavaScript interop. Both views
+  retain full local history, open on the selected newest day window, and expose
+  a horizontal scrollbar for older dates. The load view renders Monday-starting
+  weekly Cardio Load totals, a weekly target line, and the latest weekly ACWR.
+  The main table likewise keeps full history behind a selected-range-height
+  vertical viewport and has an optional weekly-summary toggle. Both chart views
+  recolor axes, grids, legends, and tooltips when the theme changes.
 * **Serilog**: the host writes structured local console output and rolling
   JSON files under `logs/health-metrics-.log`.
 * **xUnit**: tests cover models, persistence, Google Health fixtures, and HTTP

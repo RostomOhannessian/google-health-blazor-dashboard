@@ -22,14 +22,14 @@ contract and the locally persisted fields that accompany it.
 
 ## Date and range behavior
 
-- Manual sync and metric queries support 1-366 days at a time. Dashboard ranges
-  include each completed UTC day through yesterday; fixed ranges retain their
-  rounded-up complete Monday-Sunday weeks and append completed days from the
-  current week. Year-to-date runs from January 1 through the latest completed
-  UTC day.
+- Manual sync and metric queries support 1-366 days at a time. Fixed dashboard
+  ranges are exact inclusive UTC calendar ranges through today: 7/30/90 days
+  include today plus the preceding days, and year-to-date runs from January 1
+  through today.
 - The selected range is used unchanged for sync and export. The dashboard table
-  and charts hide only historical partial weeks at range boundaries while
-  retaining the current in-progress week.
+  and charts load all persisted local history, initially show the selected
+  newest window, and provide scrollbars for older days. Partial weeks remain
+  visible. Weekly table summary rows are optional and enabled by default.
 - The automatic daily sync remains configurable from 1-90 days.
 - Google Health daily rollups use closed-open civil-date ranges aligned to the requested days.
 - Rollup requests are chunked in 14-day windows to stay inside stricter Google Health range limits for affected data types.

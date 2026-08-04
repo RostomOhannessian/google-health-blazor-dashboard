@@ -21,20 +21,8 @@ internal sealed class GoogleHealthSyncService(
             throw new ArgumentOutOfRangeException(nameof(dayCount), "Day count must be between 1 and 366.");
 
         var endDate = DateOnly.FromDateTime(DateTime.UtcNow);
-        return await SyncDateRangeAsync(
-            endDate.AddDays(-(dayCount - 1)),
-            endDate,
-            cancellationToken);
-    }
-
-    public async Task<SyncResult> SyncDateRangeAsync(
-        DateOnly startDate,
-        DateOnly endDate,
-        CancellationToken cancellationToken = default)
-    {
-        var dayCount = ValidateDateRange(startDate, endDate);
         return await SnapshotMutationCoordinator.RunAsync(
-            () => RunSyncCoreAsync(startDate, endDate, dayCount, cancellationToken),
+            () => RunSyncCoreAsync(endDate.AddDays(-(dayCount - 1)), endDate, dayCount, cancellationToken),
             cancellationToken);
     }
 
@@ -173,20 +161,6 @@ internal sealed class GoogleHealthSyncService(
 
             throw;
         }
-    }
-
-    private static int ValidateDateRange(DateOnly startDate, DateOnly endDate)
-    {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var dayCount = endDate.DayNumber - startDate.DayNumber + 1;
-        if (startDate > endDate || endDate > today || dayCount > 366)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(endDate),
-                "Date range must be ordered, end no later than today, and contain at most 366 days.");
-        }
-
-        return dayCount;
     }
 
     private static void Merge(DailyMetricSnapshot target, DailyMetricSnapshot source)

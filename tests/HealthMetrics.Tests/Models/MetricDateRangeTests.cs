@@ -5,77 +5,71 @@ namespace HealthMetrics.Tests.Models;
 public sealed class MetricDateRangeTests
 {
     [Theory]
-    [InlineData(7, 2026, 8, 3, 2026, 7, 27, 2026, 8, 2)]
-    [InlineData(30, 2026, 8, 3, 2026, 6, 29, 2026, 8, 2)]
-    [InlineData(90, 2026, 8, 3, 2026, 5, 4, 2026, 8, 2)]
-    [InlineData(30, 2026, 8, 9, 2026, 7, 6, 2026, 8, 9)]
-    public void ForRecentFullWeeks_RoundsUpAndEndsOnSunday(
+    [InlineData(7, 2026, 8, 4, 2026, 7, 29)]
+    [InlineData(30, 2026, 8, 4, 2026, 7, 6)]
+    [InlineData(90, 2026, 8, 4, 2026, 5, 7)]
+    [InlineData(30, 2026, 8, 9, 2026, 7, 11)]
+    public void ForRecentDays_UsesExactInclusiveCalendarRange(
         int requestedDays,
-        int todayYear,
-        int todayMonth,
-        int todayDay,
+        int endYear,
+        int endMonth,
+        int endDay,
         int expectedStartYear,
         int expectedStartMonth,
-        int expectedStartDay,
-        int expectedEndYear,
-        int expectedEndMonth,
-        int expectedEndDay)
+        int expectedStartDay)
     {
-        var range = MetricDateRange.ForRecentFullWeeks(
+        var range = MetricDateRange.ForRecentDays(
             requestedDays,
-            new DateOnly(todayYear, todayMonth, todayDay));
+            new DateOnly(endYear, endMonth, endDay));
 
         Assert.Equal(new DateOnly(expectedStartYear, expectedStartMonth, expectedStartDay), range.StartDate);
-        Assert.Equal(new DateOnly(expectedEndYear, expectedEndMonth, expectedEndDay), range.EndDate);
-        Assert.Equal(((requestedDays + 6) / 7) * 7, range.DayCount);
-    }
-
-    [Theory]
-    [InlineData(7, 2026, 8, 3, 2026, 7, 27, 2026, 8, 2, 7)]
-    [InlineData(30, 2026, 8, 4, 2026, 6, 29, 2026, 8, 3, 36)]
-    [InlineData(90, 2026, 8, 4, 2026, 5, 4, 2026, 8, 3, 92)]
-    [InlineData(30, 2026, 8, 10, 2026, 7, 6, 2026, 8, 9, 35)]
-    public void ForRecentFullWeeksThroughLastCompletedDay_IncludesCompletedCurrentWeekDays(
-        int requestedDays,
-        int todayYear,
-        int todayMonth,
-        int todayDay,
-        int expectedStartYear,
-        int expectedStartMonth,
-        int expectedStartDay,
-        int expectedEndYear,
-        int expectedEndMonth,
-        int expectedEndDay,
-        int expectedDayCount)
-    {
-        var range = MetricDateRange.ForRecentFullWeeksThroughLastCompletedDay(
-            requestedDays,
-            new DateOnly(todayYear, todayMonth, todayDay));
-
-        Assert.Equal(new DateOnly(expectedStartYear, expectedStartMonth, expectedStartDay), range.StartDate);
-        Assert.Equal(new DateOnly(expectedEndYear, expectedEndMonth, expectedEndDay), range.EndDate);
-        Assert.Equal(expectedDayCount, range.DayCount);
+        Assert.Equal(new DateOnly(endYear, endMonth, endDay), range.EndDate);
+        Assert.Equal(requestedDays, range.DayCount);
     }
 
     [Fact]
-    public void ForYearToDate_EndsOnLastCompletedDay()
+    public void ForRecentDays_CanEndOnJanuaryFirst()
+    {
+        var range = MetricDateRange.ForRecentDays(1, new DateOnly(2026, 1, 1));
+
+        Assert.Equal(new DateOnly(2026, 1, 1), range.StartDate);
+        Assert.Equal(new DateOnly(2026, 1, 1), range.EndDate);
+        Assert.Equal(1, range.DayCount);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void ForRecentDays_RejectsNonPositiveDayCounts(int requestedDays)
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => MetricDateRange.ForRecentDays(requestedDays, new DateOnly(2026, 8, 4)));
+    }
+
+    [Fact]
+    public void ForRecentDays_RejectsRangesBeforeDateOnlyMinimum()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => MetricDateRange.ForRecentDays(2, DateOnly.MinValue));
+    }
+
+    [Fact]
+    public void ForYearToDate_IncludesCurrentDate()
     {
         var range = MetricDateRange.ForYearToDate(new DateOnly(2026, 8, 4));
 
         Assert.Equal(new DateOnly(2026, 1, 1), range.StartDate);
-        Assert.Equal(new DateOnly(2026, 8, 3), range.EndDate);
-        Assert.Equal(215, range.DayCount);
+        Assert.Equal(new DateOnly(2026, 8, 4), range.EndDate);
+        Assert.Equal(216, range.DayCount);
     }
 
     [Fact]
-    public void IncludesWeekForDisplay_ExcludesHistoricalPartialWeeksAndKeepsCurrentWeek()
+    public void ForYearToDate_OnJanuaryFirstContainsOneDay()
     {
-        var range = MetricDateRange.ForYearToDate(new DateOnly(2026, 8, 4));
-        var today = new DateOnly(2026, 8, 4);
+        var range = MetricDateRange.ForYearToDate(new DateOnly(2026, 1, 1));
 
-        Assert.False(range.IncludesWeekForDisplay(new DateOnly(2025, 12, 29), today));
-        Assert.True(range.IncludesWeekForDisplay(new DateOnly(2026, 1, 5), today));
-        Assert.True(range.IncludesWeekForDisplay(new DateOnly(2026, 7, 27), today));
-        Assert.True(range.IncludesWeekForDisplay(new DateOnly(2026, 8, 3), today));
+        Assert.Equal(new DateOnly(2026, 1, 1), range.StartDate);
+        Assert.Equal(new DateOnly(2026, 1, 1), range.EndDate);
+        Assert.Equal(1, range.DayCount);
     }
 }

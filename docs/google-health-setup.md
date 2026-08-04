@@ -242,10 +242,13 @@ merges daily rows, and records a sync-history entry. A date with no provider
 value is still allowed to display dashes. Google Health data availability
 depends on the account, connected devices, source apps, date range, and granted
 scopes; missing values are not automatically an application error.
-The dashboard includes every completed UTC day through yesterday, so a Monday
-record is available on Tuesday even though its Monday-Sunday week is not yet
-complete. Sync uses the full selected range; the table and charts hide only
-historical partial weeks and retain the current in-progress week.
+The dashboard includes today as well as the preceding days in the selected
+exact UTC range. A Monday record can therefore be visible immediately even
+though its Monday-Sunday week is not yet complete. Sync and export use exactly
+the selected number of days. The table and charts initially show that newest
+window, while their scrollbars reach older history already persisted in the
+local database. Weekly summary rows in the table are enabled by default and can
+be toggled off.
 
 ### Demo data and export
 

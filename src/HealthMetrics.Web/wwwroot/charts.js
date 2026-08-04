@@ -38,38 +38,55 @@ window.HealthCharts = (function () {
         chart.update();
     }
 
+    function visibleIndexBounds(chart, weekStarts) {
+        const xScale = chart.scales?.x;
+        const labels = chart.data.labels;
+        if (!xScale
+            || !Array.isArray(weekStarts)
+            || !Array.isArray(labels)
+            || weekStarts.length !== labels.length
+            || labels.length === 0) {
+            return null;
+        }
+
+        const min = Number(xScale.min);
+        const max = Number(xScale.max);
+        return {
+            first: Math.max(0, Number.isFinite(min) ? Math.floor(min) : 0),
+            last: Math.min(labels.length - 1, Number.isFinite(max) ? Math.ceil(max) : labels.length - 1)
+        };
+    }
+
     function weekRanges(chart, weekStarts) {
         const chartArea = chart.chartArea;
         const xScale = chart.scales?.x;
         const labels = chart.data.labels;
-        if (!chartArea
-            || !xScale
-            || !Array.isArray(weekStarts)
-            || !Array.isArray(labels)
-            || weekStarts.length === 0
-            || weekStarts.length !== labels.length) {
+        const bounds = visibleIndexBounds(chart, weekStarts);
+        if (!chartArea || !xScale || !bounds || bounds.first > bounds.last) {
             return [];
         }
 
         const ranges = [];
-        let rangeStart = 0;
-        let currentWeek = weekStarts[0];
+        let rangeStart = bounds.first;
+        let currentWeek = weekStarts[rangeStart];
 
-        for (let index = 1; index <= weekStarts.length; index++) {
-            if (index < weekStarts.length && weekStarts[index] === currentWeek) {
+        for (let index = bounds.first + 1; index <= bounds.last + 1; index++) {
+            if (index <= bounds.last && weekStarts[index] === currentWeek) {
                 continue;
             }
 
-            const left = rangeStart === 0
+            const left = rangeStart === bounds.first
                 ? chartArea.left
                 : (xScale.getPixelForValue(rangeStart - 1) + xScale.getPixelForValue(rangeStart)) / 2;
-            const right = index === weekStarts.length
+            const right = index > bounds.last
                 ? chartArea.right
                 : (xScale.getPixelForValue(index - 1) + xScale.getPixelForValue(index)) / 2;
             ranges.push({ left, right });
 
-            rangeStart = index;
-            currentWeek = weekStarts[index];
+            if (index <= bounds.last) {
+                rangeStart = index;
+                currentWeek = weekStarts[index];
+            }
         }
 
         return ranges;
@@ -128,15 +145,87 @@ window.HealthCharts = (function () {
         }
     };
 
+    function destroyChart(canvasId) {
+        const state = charts[canvasId];
+        if (!state) return;
+
+        state.cleanup();
+        state.chart.destroy();
+        delete charts[canvasId];
+    }
+
+    function bindHistoryScroll(canvasId, scrollId, chart, visibleDayCount) {
+        const scrollElement = document.getElementById(scrollId);
+        const spacer = scrollElement?.querySelector(".chart-history-scroll-spacer");
+        const totalDays = chart.data.labels.length;
+        const windowDays = Math.min(
+            totalDays,
+            Math.max(1, Number.isFinite(Number(visibleDayCount)) ? Number(visibleDayCount) : totalDays));
+
+        if (!scrollElement || !spacer || totalDays === 0) {
+            return () => { };
+        }
+
+        let animationFrame = 0;
+        let resizeFrame = 0;
+
+        const updateChartWindow = () => {
+            animationFrame = 0;
+            const maxScroll = scrollElement.scrollWidth - scrollElement.clientWidth;
+            const maxStart = Math.max(0, totalDays - windowDays);
+            const ratio = maxScroll > 0
+                ? scrollElement.scrollLeft / maxScroll
+                : 1;
+            const start = Math.round(Math.max(0, Math.min(1, ratio)) * maxStart);
+            chart.options.scales.x.min = start;
+            chart.options.scales.x.max = start + windowDays - 1;
+            chart.update("none");
+        };
+
+        const scheduleChartWindowUpdate = () => {
+            if (animationFrame) return;
+            animationFrame = requestAnimationFrame(updateChartWindow);
+        };
+
+        const sizeScroller = (showLatest) => {
+            resizeFrame = 0;
+            const viewportWidth = Math.max(scrollElement.clientWidth, 1);
+            const hasOlderHistory = totalDays > windowDays;
+            const contentWidth = hasOlderHistory
+                ? Math.ceil(viewportWidth * totalDays / windowDays)
+                : viewportWidth;
+            spacer.style.width = `${contentWidth}px`;
+            scrollElement.classList.toggle("has-older-history", hasOlderHistory);
+            if (showLatest) {
+                scrollElement.scrollLeft = Math.max(0, scrollElement.scrollWidth - viewportWidth);
+            }
+            updateChartWindow();
+        };
+
+        const scheduleScrollerResize = () => {
+            if (resizeFrame) return;
+            resizeFrame = requestAnimationFrame(() => sizeScroller(false));
+        };
+
+        scrollElement.addEventListener("scroll", scheduleChartWindowUpdate, { passive: true });
+        window.addEventListener("resize", scheduleScrollerResize);
+        requestAnimationFrame(() => sizeScroller(true));
+
+        return () => {
+            scrollElement.removeEventListener("scroll", scheduleChartWindowUpdate);
+            window.removeEventListener("resize", scheduleScrollerResize);
+            if (animationFrame) cancelAnimationFrame(animationFrame);
+            if (resizeFrame) cancelAnimationFrame(resizeFrame);
+        };
+    }
+
     window.addEventListener("healthmetrics:themechange", () => {
-        Object.values(charts).forEach(applyTheme);
+        Object.values(charts).forEach(state => applyTheme(state.chart));
     });
 
     return {
-        render(canvasId, labels, heartRateData, hrvData) {
-            if (charts[canvasId]) {
-                charts[canvasId].destroy();
-            }
+        render(canvasId, labels, heartRateData, hrvData, visibleDayCount, scrollId) {
+            destroyChart(canvasId);
             const canvas = document.getElementById(canvasId);
             if (!canvas) return;
 
@@ -171,6 +260,8 @@ window.HealthCharts = (function () {
             const colors = themeColors();
             const scales = {
                 x: {
+                    min: 0,
+                    max: Math.max(0, Math.min(labels.length, visibleDayCount) - 1),
                     title: { display: false, color: colors.muted },
                     ticks: { color: colors.muted },
                     grid: { color: colors.grid },
@@ -198,11 +289,12 @@ window.HealthCharts = (function () {
                 };
             }
 
-            charts[canvasId] = new Chart(canvas, {
+            const chart = new Chart(canvas, {
                 type: "line",
                 data: { labels, datasets },
                 options: {
                     responsive: true,
+                    maintainAspectRatio: false,
                     interaction: { mode: "index", intersect: false },
                     plugins: {
                         legend: { position: "top", labels: { color: colors.text } },
@@ -217,6 +309,11 @@ window.HealthCharts = (function () {
                     scales
                 }
             });
+            charts[canvasId] = {
+                chart,
+                cleanup: () => { }
+            };
+            charts[canvasId].cleanup = bindHistoryScroll(canvasId, scrollId, chart, visibleDayCount);
         },
 
         renderLoad(
@@ -226,10 +323,10 @@ window.HealthCharts = (function () {
             cumulativeCardioLoadData,
             targetData,
             manualAcwrData,
-            weekStarts) {
-            if (charts[canvasId]) {
-                charts[canvasId].destroy();
-            }
+            weekStarts,
+            visibleDayCount,
+            scrollId) {
+            destroyChart(canvasId);
             const canvas = document.getElementById(canvasId);
             if (!canvas) return;
 
@@ -300,12 +397,13 @@ window.HealthCharts = (function () {
                 });
             }
 
-            charts[canvasId] = new Chart(canvas, {
+            const chart = new Chart(canvas, {
                 type: "line",
                 data: { labels, datasets },
                 plugins: [loadWeekBandsPlugin],
                 options: {
                     responsive: true,
+                    maintainAspectRatio: false,
                     interaction: { mode: "index", intersect: false },
                     plugins: {
                         loadWeekBands: { weekStarts },
@@ -325,7 +423,9 @@ window.HealthCharts = (function () {
                     },
                     scales: {
                         x: {
-                            title: { display: true, text: "Daily values (weeks start Monday)", color: colors.muted },
+                            min: 0,
+                            max: Math.max(0, Math.min(labels.length, visibleDayCount) - 1),
+                            title: { display: true, text: "Daily values (Monday-starting weeks)", color: colors.muted },
                             ticks: { color: colors.muted },
                             grid: { color: colors.grid },
                             border: { color: colors.grid }
@@ -351,13 +451,23 @@ window.HealthCharts = (function () {
                     }
                 }
             });
+            charts[canvasId] = {
+                chart,
+                cleanup: () => { }
+            };
+            charts[canvasId].cleanup = bindHistoryScroll(canvasId, scrollId, chart, visibleDayCount);
         },
 
         destroy(canvasId) {
-            if (charts[canvasId]) {
-                charts[canvasId].destroy();
-                delete charts[canvasId];
-            }
+            destroyChart(canvasId);
+        },
+
+        resetScroll(elementId) {
+            const element = document.getElementById(elementId);
+            if (!element) return;
+
+            element.scrollTop = 0;
+            element.scrollLeft = 0;
         }
     };
 })();

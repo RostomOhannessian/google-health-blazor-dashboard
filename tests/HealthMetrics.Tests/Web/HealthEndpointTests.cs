@@ -133,10 +133,10 @@ public sealed class HealthEndpointTests
     }
 
     [Fact]
-    public async Task RootDocument_IncludesTheLastCompletedDayInTheSelectedRange()
+    public async Task RootDocument_UsesExactCurrentDayRange()
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var expectedRange = MetricDateRange.ForRecentFullWeeksThroughLastCompletedDay(30, today);
+        var expectedRange = MetricDateRange.ForRecentDays(30, today);
         await using var factory = new HealthMetricsWebApplicationFactory();
         var client = factory.CreateClient();
 
@@ -148,9 +148,15 @@ public sealed class HealthEndpointTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(expectedRange.StartDate, queryService.LastStartDate);
         Assert.Equal(expectedRange.EndDate, queryService.LastEndDate);
-        Assert.Contains($"Sync last {expectedRange.DayCount} days", html);
+        Assert.Contains("Sync last 30 days", html);
+        Assert.Contains("weekly-summaries-toggle", html);
+        Assert.Contains("dailySnapshotsScroll", html);
+        Assert.Contains("Scroll chart history horizontally", html);
+        Assert.Contains("Scroll daily snapshot history", html);
+        Assert.Contains("checked", html);
         Assert.Contains($"api/metrics/export?days={expectedRange.DayCount}", html);
         Assert.Contains($"endDate={expectedRange.EndDate:yyyy-MM-dd}", html);
+        Assert.DoesNotContain("historical partial weeks are hidden", html);
     }
 
     [Fact]
@@ -284,10 +290,12 @@ public sealed class HealthEndpointTests
         Assert.Contains("Weekly target", script);
         Assert.Contains("Manual ACWR", script);
         Assert.Contains("yAcwr", script);
-        Assert.Contains("Daily values (weeks start Monday)", script);
+        Assert.Contains("Daily values (Monday-starting weeks)", script);
         Assert.Contains("type: \"bar\"", script);
         Assert.Contains("loadWeekBands", script);
         Assert.Contains("isWeekBoundary", script);
+        Assert.Contains("bindHistoryScroll", script);
+        Assert.Contains("maintainAspectRatio: false", script);
     }
 
     [Theory]
@@ -423,12 +431,6 @@ public sealed class HealthEndpointTests
     {
         public Task<SyncResult> SyncRecentDaysAsync(int dayCount, CancellationToken cancellationToken = default) =>
             Task.FromResult(new SyncResult(dayCount, dayCount, DateTimeOffset.UtcNow));
-
-        public Task<SyncResult> SyncDateRangeAsync(
-            DateOnly startDate,
-            DateOnly endDate,
-            CancellationToken cancellationToken = default) =>
-            Task.FromResult(new SyncResult(endDate.DayNumber - startDate.DayNumber + 1, endDate.DayNumber - startDate.DayNumber + 1, DateTimeOffset.UtcNow));
     }
 
     private sealed class FakeMetricQueryService(bool includeOlderMetric) : IMetricQueryService
@@ -455,8 +457,13 @@ public sealed class HealthEndpointTests
                 ? [CreateSnapshot(new DateOnly(2026, 7, 18)), CreateSnapshot(new DateOnly(2026, 7, 17))]
                 : [CreateSnapshot(new DateOnly(2026, 7, 18))]);
 
-        public Task<IReadOnlyList<DailyMetricSnapshot>> GetAllMetricsAsync(CancellationToken cancellationToken = default) =>
-            GetFakeMetrics();
+        public Task<IReadOnlyList<DailyMetricSnapshot>> GetAllMetricsAsync(CancellationToken cancellationToken = default)
+        {
+            var range = MetricDateRange.ForRecentDays(30, DateOnly.FromDateTime(DateTime.UtcNow));
+            LastStartDate = range.StartDate;
+            LastEndDate = range.EndDate;
+            return GetFakeMetrics();
+        }
 
         public Task<IReadOnlyList<SyncHistoryEntry>> GetRecentSyncHistoryAsync(int count = 10, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<SyncHistoryEntry>>([]);

@@ -166,7 +166,7 @@ From the repository root:
 
 ```powershell
 git clone <repository-url>
-Set-Location .\fitbit-metrics
+Set-Location .\google-health-blazor-dashboard
 dotnet restore .\HealthMetrics.slnx
 dotnet tool restore
 dotnet build .\HealthMetrics.slnx
@@ -177,7 +177,7 @@ On macOS/Linux, use:
 
 ```bash
 git clone <repository-url>
-cd fitbit-metrics
+cd google-health-blazor-dashboard
 dotnet restore ./HealthMetrics.slnx
 dotnet tool restore
 dotnet build ./HealthMetrics.slnx

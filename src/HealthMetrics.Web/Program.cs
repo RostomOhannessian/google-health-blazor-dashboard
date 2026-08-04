@@ -63,8 +63,16 @@ try
         app.UseHsts();
     }
 
+    var allowMissingRemoteIp = app.Configuration.GetValue<bool>("LocalRequestPolicy:AllowMissingRemoteIp");
+
     app.Use(async (context, next) =>
     {
+        if (context.Connection.RemoteIpAddress is null && allowMissingRemoteIp)
+        {
+            await next();
+            return;
+        }
+
         if (LocalRequestPolicy.IsLocal(context))
         {
             await next();

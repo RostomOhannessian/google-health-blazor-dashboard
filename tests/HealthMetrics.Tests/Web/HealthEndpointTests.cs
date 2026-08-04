@@ -327,6 +327,7 @@ public sealed class HealthEndpointTests
             {
                 configuration.AddInMemoryCollection(
                 [
+                   new KeyValuePair<string, string?>("LocalRequestPolicy:AllowMissingRemoteIp", "true"),
                     new KeyValuePair<string, string?>("GoogleHealthApi:ClientId", "health-metrics-test-client"),
                     new KeyValuePair<string, string?>("GoogleHealthApi:ClientSecret", "health-metrics-test-secret"),
                     new KeyValuePair<string, string?>("GoogleHealthApi:RedirectUri", "https://localhost:5001/api/health/callback"),

@@ -242,6 +242,9 @@ merges daily rows, and records a sync-history entry. A date with no provider
 value is still allowed to display dashes. Google Health data availability
 depends on the account, connected devices, source apps, date range, and granted
 scopes; missing values are not automatically an application error.
+The dashboard includes every completed UTC day through yesterday, so a Monday
+record is available on Tuesday even though its Monday-Sunday week is not yet
+complete.
 
 ### Demo data and export
 

@@ -133,6 +133,27 @@ public sealed class HealthEndpointTests
     }
 
     [Fact]
+    public async Task RootDocument_IncludesTheLastCompletedDayInTheSelectedRange()
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var expectedRange = MetricDateRange.ForRecentFullWeeksThroughLastCompletedDay(30, today);
+        await using var factory = new HealthMetricsWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var response = await client.GetAsync("/");
+        var html = await response.Content.ReadAsStringAsync();
+        var queryService = Assert.IsType<FakeMetricQueryService>(
+            factory.Services.GetRequiredService<IMetricQueryService>());
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(expectedRange.StartDate, queryService.LastStartDate);
+        Assert.Equal(expectedRange.EndDate, queryService.LastEndDate);
+        Assert.Contains($"Sync last {expectedRange.DayCount} days", html);
+        Assert.Contains($"api/metrics/export?days={expectedRange.DayCount}", html);
+        Assert.Contains($"endDate={expectedRange.EndDate:yyyy-MM-dd}", html);
+    }
+
+    [Fact]
     public async Task RootDocument_ReferencesResolvableScopedStylesheet()
     {
         await using var factory = new HealthMetricsWebApplicationFactory();

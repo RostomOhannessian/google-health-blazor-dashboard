@@ -22,8 +22,11 @@ contract and the locally persisted fields that accompany it.
 
 ## Date and range behavior
 
-- Manual sync and metric queries support 1-366 days at a time, including the
-  dashboard's year-to-date range from January 1 through the current UTC date.
+- Manual sync and metric queries support 1-366 days at a time. Dashboard ranges
+  include each completed UTC day through yesterday; fixed ranges retain their
+  rounded-up complete Monday-Sunday weeks and append completed days from the
+  current week. Year-to-date runs from January 1 through the latest completed
+  UTC day.
 - The automatic daily sync remains configurable from 1-90 days.
 - Google Health daily rollups use closed-open civil-date ranges aligned to the requested days.
 - Rollup requests are chunked in 14-day windows to stay inside stricter Google Health range limits for affected data types.

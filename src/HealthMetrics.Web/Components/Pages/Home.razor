@@ -429,7 +429,7 @@
                             <td>@Display(metric.ProteinGrams, "F2")</td>
                         </tr>
                     }
-                    @if (ShowsWeeklySummaries)
+                    @if (ShouldShowWeeklySummary(weeklyGroup))
                     {
                         <tr class="weekly-summary-row">
                             <th scope="row"
@@ -562,7 +562,9 @@
     private MetricDateRange SelectedDateRange =>
         IsYearToDate
             ? MetricDateRange.ForYearToDate(DateOnly.FromDateTime(DateTime.UtcNow))
-            : MetricDateRange.ForRecentFullWeeks((int)selectedRange, DateOnly.FromDateTime(DateTime.UtcNow));
+            : MetricDateRange.ForRecentFullWeeksThroughLastCompletedDay(
+                (int)selectedRange,
+                DateOnly.FromDateTime(DateTime.UtcNow));
 
     private int SelectedDayCount =>
         SelectedDateRange.DayCount;
@@ -594,6 +596,10 @@
         GroupWeeklyMetrics(SortedMetrics);
 
     private bool ShowsWeeklySummaries => sortColumn == "date";
+
+    private bool ShouldShowWeeklySummary(WeeklyMetricGroup weeklyGroup) =>
+        ShowsWeeklySummaries
+        && weeklyGroup.WeekStart.AddDays(6) <= SelectedDateRange.EndDate;
 
     protected override async Task OnInitializedAsync()
     {

@@ -650,57 +650,67 @@
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         var chartHasData = chartMode == ChartMode.Load ? HasLoadMetrics : HasHeartMetrics;
-        if (chartNeedsRender && chartHasData)
+        if (chartNeedsRender)
         {
             chartNeedsRender = false;
-            var chartSnapshots = BuildChartSnapshots();
-            if (chartMode == ChartMode.Load)
-            {
-                var dailyLoad = WeeklyLoadCalculator.BuildDailySeries(chartSnapshots);
-                var labels = dailyLoad
-                    .Select(day => day.MetricDate.ToString("ddd, MMM d"))
-                    .ToArray();
-                var dailyCardioLoadData = dailyLoad.Select(day => (object?)day.CardioLoad).ToArray();
-                var cumulativeCardioLoadData = dailyLoad.Select(day => (object?)day.CumulativeCardioLoad).ToArray();
-                var targetData = dailyLoad.Select(day => (object?)day.TargetLoad).ToArray();
-                var manualAcwrData = dailyLoad.Select(day => (object?)day.Acwr).ToArray();
-                var weekStarts = dailyLoad.Select(day => day.WeekStart.ToString("yyyy-MM-dd")).ToArray();
-                await JS.InvokeVoidAsync(
-                    "HealthCharts.renderLoad",
-                    "metricsChart",
-                    labels,
-                    dailyCardioLoadData,
-                    cumulativeCardioLoadData,
-                    targetData,
-                    manualAcwrData,
-                    weekStarts,
-                    SelectedDayCount,
-                    "metricsChartHistoryScroll");
-            }
+            if (chartHasData)
+                await RenderChartAsync();
             else
-            {
-                var labels = chartSnapshots.Select(m => m.MetricDate.ToString("MMM d")).ToArray();
-                var hrData = chartSnapshots
-                    .Select(m => (object?)(m.RestingHeartRateBpm.HasValue ? m.RestingHeartRateBpm.Value : (int?)null))
-                    .ToArray();
-                var hrvData = chartSnapshots
-                    .Select(m => (object?)(m.HrvRmssdMilliseconds.HasValue ? (double)m.HrvRmssdMilliseconds.Value : (double?)null))
-                    .ToArray();
-                await JS.InvokeVoidAsync(
-                    "HealthCharts.render",
-                    "metricsChart",
-                    labels,
-                    hrData,
-                    hrvData,
-                    SelectedDayCount,
-                    "metricsChartHistoryScroll");
-            }
+                await JS.InvokeVoidAsync("HealthCharts.destroy", "metricsChart");
         }
 
         if (tableNeedsScrollReset)
         {
             tableNeedsScrollReset = false;
             await JS.InvokeVoidAsync("HealthCharts.resetScroll", "dailySnapshotsScroll");
+        }
+    }
+
+    private async Task RenderChartAsync()
+    {
+        var chartSnapshots = BuildChartSnapshots();
+        if (chartMode == ChartMode.Load)
+        {
+            var dailyLoad = WeeklyLoadCalculator.BuildDailySeries(chartSnapshots);
+            var labels = dailyLoad
+                .Select(day => day.MetricDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture))
+                .ToArray();
+            var dailyCardioLoadData = dailyLoad.Select(day => (object?)day.CardioLoad).ToArray();
+            var cumulativeCardioLoadData = dailyLoad.Select(day => (object?)day.CumulativeCardioLoad).ToArray();
+            var targetData = dailyLoad.Select(day => (object?)day.TargetLoad).ToArray();
+            var manualAcwrData = dailyLoad.Select(day => (object?)day.Acwr).ToArray();
+            var weekStarts = dailyLoad.Select(day => day.WeekStart.ToString("yyyy-MM-dd")).ToArray();
+            await JS.InvokeVoidAsync(
+                "HealthCharts.renderLoad",
+                "metricsChart",
+                labels,
+                dailyCardioLoadData,
+                cumulativeCardioLoadData,
+                targetData,
+                manualAcwrData,
+                weekStarts,
+                SelectedDayCount,
+                "metricsChartHistoryScroll");
+        }
+        else
+        {
+            var labels = chartSnapshots
+                .Select(metric => metric.MetricDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture))
+                .ToArray();
+            var hrData = chartSnapshots
+                .Select(metric => (object?)(metric.RestingHeartRateBpm.HasValue ? metric.RestingHeartRateBpm.Value : (int?)null))
+                .ToArray();
+            var hrvData = chartSnapshots
+                .Select(metric => (object?)(metric.HrvRmssdMilliseconds.HasValue ? (double)metric.HrvRmssdMilliseconds.Value : (double?)null))
+                .ToArray();
+            await JS.InvokeVoidAsync(
+                "HealthCharts.render",
+                "metricsChart",
+                labels,
+                hrData,
+                hrvData,
+                SelectedDayCount,
+                "metricsChartHistoryScroll");
         }
     }
 

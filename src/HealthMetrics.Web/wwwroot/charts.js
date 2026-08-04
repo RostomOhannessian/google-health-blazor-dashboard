@@ -1,5 +1,43 @@
 window.HealthCharts = (function () {
     const charts = {};
+    const chartTickDateFormat = new Intl.DateTimeFormat(undefined, {
+        month: "short",
+        day: "numeric"
+    });
+    const chartTooltipDateFormat = new Intl.DateTimeFormat(undefined, {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        year: "numeric"
+    });
+
+    function parseCalendarDate(value) {
+        if (typeof value !== "string") return null;
+
+        const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+        if (!match) return null;
+
+        const date = new Date(
+            Number(match[1]),
+            Number(match[2]) - 1,
+            Number(match[3]));
+        return Number.isNaN(date.getTime()) ? null : date;
+    }
+
+    function formatCalendarDate(value, formatter) {
+        const date = parseCalendarDate(value);
+        return date ? formatter.format(date) : value;
+    }
+
+    function chartTickCallback(value) {
+        return formatCalendarDate(this.getLabelForValue(value), chartTickDateFormat);
+    }
+
+    function chartTooltipTitle(items) {
+        return items.length > 0
+            ? formatCalendarDate(items[0].label, chartTooltipDateFormat)
+            : "";
+    }
 
     function themeColors() {
         const style = getComputedStyle(document.documentElement);
@@ -263,7 +301,10 @@ window.HealthCharts = (function () {
                     min: 0,
                     max: Math.max(0, Math.min(labels.length, visibleDayCount) - 1),
                     title: { display: false, color: colors.muted },
-                    ticks: { color: colors.muted },
+                    ticks: {
+                        color: colors.muted,
+                        callback: chartTickCallback
+                    },
                     grid: { color: colors.grid },
                     border: { color: colors.grid }
                 }
@@ -299,6 +340,9 @@ window.HealthCharts = (function () {
                     plugins: {
                         legend: { position: "top", labels: { color: colors.text } },
                         tooltip: {
+                            callbacks: {
+                                title: chartTooltipTitle
+                            },
                             titleColor: colors.text,
                             bodyColor: colors.text,
                             backgroundColor: colors.tooltipBackground,
@@ -414,6 +458,9 @@ window.HealthCharts = (function () {
                             }
                         },
                         tooltip: {
+                            callbacks: {
+                                title: chartTooltipTitle
+                            },
                             titleColor: colors.text,
                             bodyColor: colors.text,
                             backgroundColor: colors.tooltipBackground,
@@ -426,7 +473,10 @@ window.HealthCharts = (function () {
                             min: 0,
                             max: Math.max(0, Math.min(labels.length, visibleDayCount) - 1),
                             title: { display: true, text: "Daily values (Monday-starting weeks)", color: colors.muted },
-                            ticks: { color: colors.muted },
+                            ticks: {
+                                color: colors.muted,
+                                callback: chartTickCallback
+                            },
                             grid: { color: colors.grid },
                             border: { color: colors.grid }
                         },

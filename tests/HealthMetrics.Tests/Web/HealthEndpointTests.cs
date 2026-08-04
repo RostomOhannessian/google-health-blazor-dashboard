@@ -179,6 +179,8 @@ public sealed class HealthEndpointTests
         Assert.Equal(HttpStatusCode.OK, stylesheet.StatusCode);
         var stylesheetContent = await stylesheet.Content.ReadAsStringAsync();
         Assert.Contains(".page[", stylesheetContent);
+        Assert.Contains(".chart-plot", stylesheetContent);
+        Assert.Contains("height: 520px", stylesheetContent);
         Assert.Contains(".daily-snapshots-scroll", stylesheetContent);
         Assert.Contains("height: 72rem", stylesheetContent);
     }
@@ -299,6 +301,26 @@ public sealed class HealthEndpointTests
         Assert.Contains("isWeekBoundary", script);
         Assert.Contains("bindHistoryScroll", script);
         Assert.Contains("maintainAspectRatio: false", script);
+        Assert.Contains("formatCalendarDate", script);
+        Assert.Contains("chartTooltipTitle", script);
+    }
+
+    [Fact]
+    public async Task RootDocument_RendersPersistedHistoryOutsideTheSelectedRange()
+    {
+        var outsideSelectedRange = MetricDateRange
+            .ForRecentDays(30, DateOnly.FromDateTime(DateTime.UtcNow))
+            .StartDate
+            .AddDays(-1);
+        await using var factory = new HealthMetricsWebApplicationFactory(includeOutsideSelectedRangeMetric: true);
+        var client = factory.CreateClient();
+
+        var html = await client.GetStringAsync("/");
+
+        Assert.Contains(
+            outsideSelectedRange.ToString("ddd, MMM d", System.Globalization.CultureInfo.CurrentCulture),
+            html);
+        Assert.Contains("2 persisted history days", html);
     }
 
     [Theory]
@@ -341,15 +363,18 @@ public sealed class HealthEndpointTests
         private readonly bool useRealAuthorization;
         private readonly bool requiresReconnect;
         private readonly bool includeOlderMetric;
+        private readonly bool includeOutsideSelectedRangeMetric;
 
         public HealthMetricsWebApplicationFactory(
             bool useRealAuthorization = false,
             bool requiresReconnect = false,
-            bool includeOlderMetric = false)
+            bool includeOlderMetric = false,
+            bool includeOutsideSelectedRangeMetric = false)
         {
             this.useRealAuthorization = useRealAuthorization;
             this.requiresReconnect = requiresReconnect;
             this.includeOlderMetric = includeOlderMetric;
+            this.includeOutsideSelectedRangeMetric = includeOutsideSelectedRangeMetric;
         }
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -395,7 +420,7 @@ public sealed class HealthEndpointTests
                 }
                 services.AddSingleton<IHealthSyncService, FakeHealthSyncService>();
                 services.AddSingleton<IMetricQueryService>(
-                    new FakeMetricQueryService(includeOlderMetric));
+                    new FakeMetricQueryService(includeOlderMetric, includeOutsideSelectedRangeMetric));
                 services.AddSingleton<IDemoSeedService, FakeDemoSeedService>();
             });
         }
@@ -436,7 +461,9 @@ public sealed class HealthEndpointTests
             Task.FromResult(new SyncResult(dayCount, dayCount, DateTimeOffset.UtcNow));
     }
 
-    private sealed class FakeMetricQueryService(bool includeOlderMetric) : IMetricQueryService
+    private sealed class FakeMetricQueryService(
+        bool includeOlderMetric,
+        bool includeOutsideSelectedRangeMetric) : IMetricQueryService
     {
         public DateOnly? LastStartDate { get; private set; }
         public DateOnly? LastEndDate { get; private set; }
@@ -454,11 +481,25 @@ public sealed class HealthEndpointTests
             return GetFakeMetrics();
         }
 
-        private Task<IReadOnlyList<DailyMetricSnapshot>> GetFakeMetrics() =>
-            Task.FromResult<IReadOnlyList<DailyMetricSnapshot>>(
-            includeOlderMetric
-                ? [CreateSnapshot(new DateOnly(2026, 7, 18)), CreateSnapshot(new DateOnly(2026, 7, 17))]
-                : [CreateSnapshot(new DateOnly(2026, 7, 18))]);
+        private Task<IReadOnlyList<DailyMetricSnapshot>> GetFakeMetrics()
+        {
+            var metrics = new List<DailyMetricSnapshot>
+            {
+                CreateSnapshot(new DateOnly(2026, 7, 18))
+            };
+            if (includeOlderMetric)
+                metrics.Add(CreateSnapshot(new DateOnly(2026, 7, 17)));
+            if (includeOutsideSelectedRangeMetric)
+            {
+                var outsideSelectedRange = MetricDateRange
+                    .ForRecentDays(30, DateOnly.FromDateTime(DateTime.UtcNow))
+                    .StartDate
+                    .AddDays(-1);
+                metrics.Add(CreateSnapshot(outsideSelectedRange));
+            }
+
+            return Task.FromResult<IReadOnlyList<DailyMetricSnapshot>>(metrics);
+        }
 
         public Task<IReadOnlyList<DailyMetricSnapshot>> GetAllMetricsAsync(CancellationToken cancellationToken = default)
         {

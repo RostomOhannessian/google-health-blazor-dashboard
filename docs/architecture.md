@@ -59,7 +59,7 @@ separate from the load view. Both charts load the full local history and open
 on the selected newest window with a horizontal history scrollbar. The load
 view sums daily manual Cardio Load by Monday-starting week and plots the weekly
 target and latest available manual ratio on the right axis. The table keeps the
-full history behind a fixed four-week-height vertical viewport of about 32
+full history behind a fixed four-week-height vertical viewport of about 30
 rows, and its date-sorted weekly summaries can be toggled on or off.
 The CSV endpoint exports the persisted source and derived values, including
 deep/REM minutes, with invariant-culture numeric formatting.

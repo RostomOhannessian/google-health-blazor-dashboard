@@ -182,7 +182,7 @@ public sealed class HealthEndpointTests
         Assert.Contains(".chart-plot", stylesheetContent);
         Assert.Contains("height: 520px", stylesheetContent);
         Assert.Contains(".daily-snapshots-scroll", stylesheetContent);
-        Assert.Contains("height: 72rem", stylesheetContent);
+        Assert.Contains("height: 68rem", stylesheetContent);
     }
 
     [Fact]
@@ -300,7 +300,10 @@ public sealed class HealthEndpointTests
         Assert.Contains("loadWeekBands", script);
         Assert.Contains("isWeekBoundary", script);
         Assert.Contains("bindHistoryScroll", script);
+        Assert.Contains("latestWindowStart", script);
         Assert.Contains("maintainAspectRatio: false", script);
+        Assert.Contains("animation: false", script);
+        Assert.Contains("rgb(255, 193, 7)", script);
         Assert.Contains("formatCalendarDate", script);
         Assert.Contains("chartTooltipTitle", script);
     }

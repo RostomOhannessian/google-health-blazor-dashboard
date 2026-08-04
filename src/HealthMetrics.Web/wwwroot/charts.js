@@ -192,13 +192,23 @@ window.HealthCharts = (function () {
         delete charts[canvasId];
     }
 
+    function visibleWindowDayCount(totalDays, visibleDayCount) {
+        if (totalDays <= 0) return 0;
+
+        return Math.min(
+            totalDays,
+            Math.max(1, Number.isFinite(Number(visibleDayCount)) ? Number(visibleDayCount) : totalDays));
+    }
+
+    function latestWindowStart(totalDays, visibleDayCount) {
+        return Math.max(0, totalDays - visibleWindowDayCount(totalDays, visibleDayCount));
+    }
+
     function bindHistoryScroll(canvasId, scrollId, chart, visibleDayCount) {
         const scrollElement = document.getElementById(scrollId);
         const spacer = scrollElement?.querySelector(".chart-history-scroll-spacer");
         const totalDays = chart.data.labels.length;
-        const windowDays = Math.min(
-            totalDays,
-            Math.max(1, Number.isFinite(Number(visibleDayCount)) ? Number(visibleDayCount) : totalDays));
+        const windowDays = visibleWindowDayCount(totalDays, visibleDayCount);
 
         if (!scrollElement || !spacer || totalDays === 0) {
             return () => { };
@@ -296,10 +306,12 @@ window.HealthCharts = (function () {
             }
 
             const colors = themeColors();
+            const windowDays = visibleWindowDayCount(labels.length, visibleDayCount);
+            const latestStart = latestWindowStart(labels.length, visibleDayCount);
             const scales = {
                 x: {
-                    min: 0,
-                    max: Math.max(0, Math.min(labels.length, visibleDayCount) - 1),
+                    min: latestStart,
+                    max: Math.max(0, latestStart + windowDays - 1),
                     title: { display: false, color: colors.muted },
                     ticks: {
                         color: colors.muted,
@@ -386,8 +398,8 @@ window.HealthCharts = (function () {
                     label: "Daily Cardio Load",
                     data: dailyCardioLoadData,
                     type: "bar",
-                    backgroundColor: "rgba(111, 66, 193, 0.32)",
-                    borderColor: "rgb(111, 66, 193)",
+                    backgroundColor: "rgba(255, 193, 7, 0.65)",
+                    borderColor: "rgb(255, 193, 7)",
                     borderWidth: 1,
                     yAxisID: "yLoad"
                 });
@@ -441,12 +453,15 @@ window.HealthCharts = (function () {
                 });
             }
 
+            const windowDays = visibleWindowDayCount(labels.length, visibleDayCount);
+            const latestStart = latestWindowStart(labels.length, visibleDayCount);
             const chart = new Chart(canvas, {
                 type: "line",
                 data: { labels, datasets },
                 plugins: [loadWeekBandsPlugin],
                 options: {
                     responsive: true,
+                    animation: false,
                     maintainAspectRatio: false,
                     interaction: { mode: "index", intersect: false },
                     plugins: {
@@ -470,8 +485,8 @@ window.HealthCharts = (function () {
                     },
                     scales: {
                         x: {
-                            min: 0,
-                            max: Math.max(0, Math.min(labels.length, visibleDayCount) - 1),
+                            min: latestStart,
+                            max: Math.max(0, latestStart + windowDays - 1),
                             title: { display: true, text: "Daily values (Monday-starting weeks)", color: colors.muted },
                             ticks: {
                                 color: colors.muted,

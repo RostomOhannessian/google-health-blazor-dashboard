@@ -47,7 +47,7 @@ tools and operating model, not C# syntax or IDE navigation.
   a horizontal scrollbar for older dates. The load view renders Monday-starting
   weekly Cardio Load totals, a weekly target line, and the latest weekly ACWR.
   The main table likewise keeps full history behind a fixed four-week-height
-  vertical viewport of about 32 rows and has an optional weekly-summary toggle.
+  vertical viewport of about 30 rows and has an optional weekly-summary toggle.
   Both chart views recolor axes, grids, legends, and tooltips when the theme
   changes.
 * **Serilog**: the host writes structured local console output and rolling

@@ -389,8 +389,7 @@
      class="daily-snapshots-scroll"
      role="region"
      tabindex="0"
-     aria-label="Scroll daily snapshot history"
-     style="@TableViewportStyle">
+     aria-label="Scroll daily snapshot history">
     <table class="table table-striped table-sm table-hover">
         @if (allMetrics.Count > 0 && !IsDateSorted)
         {
@@ -635,18 +634,6 @@
     private bool ShowsWeeklySummaries => IsDateSorted && showWeeklySummaries;
 
     private bool ShouldShowWeeklySummary => ShowsWeeklySummaries;
-
-    private int SelectedWeekCount =>
-        selectedMetrics
-            .Select(metric => WeeklyLoadCalculator.GetWeekStart(metric.MetricDate))
-            .Distinct()
-            .Count();
-
-    private int TableViewportRows =>
-        Math.Max(1, SelectedDayCount + (ShowsWeeklySummaries ? SelectedWeekCount : 0) + 1);
-
-    private string TableViewportStyle =>
-        $"max-height: {TableViewportRows * 3}rem;";
 
     protected override async Task OnInitializedAsync()
     {

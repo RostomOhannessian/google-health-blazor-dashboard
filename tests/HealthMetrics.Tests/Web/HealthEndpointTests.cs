@@ -177,7 +177,10 @@ public sealed class HealthEndpointTests
         var stylesheet = await client.GetAsync(match.Groups["href"].Value);
 
         Assert.Equal(HttpStatusCode.OK, stylesheet.StatusCode);
-        Assert.Contains(".page[", await stylesheet.Content.ReadAsStringAsync());
+        var stylesheetContent = await stylesheet.Content.ReadAsStringAsync();
+        Assert.Contains(".page[", stylesheetContent);
+        Assert.Contains(".daily-snapshots-scroll", stylesheetContent);
+        Assert.Contains("height: 72rem", stylesheetContent);
     }
 
     [Fact]

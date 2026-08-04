@@ -67,6 +67,7 @@
 }
 
 .daily-snapshots-scroll {
+    height: 72rem;
     max-width: 100%;
     overflow: auto;
     overscroll-behavior: contain;

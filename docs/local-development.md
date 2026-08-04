@@ -46,9 +46,10 @@ tools and operating model, not C# syntax or IDE navigation.
   retain full local history, open on the selected newest day window, and expose
   a horizontal scrollbar for older dates. The load view renders Monday-starting
   weekly Cardio Load totals, a weekly target line, and the latest weekly ACWR.
-  The main table likewise keeps full history behind a selected-range-height
-  vertical viewport and has an optional weekly-summary toggle. Both chart views
-  recolor axes, grids, legends, and tooltips when the theme changes.
+  The main table likewise keeps full history behind a fixed four-week-height
+  vertical viewport of about 32 rows and has an optional weekly-summary toggle.
+  Both chart views recolor axes, grids, legends, and tooltips when the theme
+  changes.
 * **Serilog**: the host writes structured local console output and rolling
   JSON files under `logs/health-metrics-.log`.
 * **xUnit**: tests cover models, persistence, Google Health fixtures, and HTTP

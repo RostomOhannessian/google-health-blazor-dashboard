@@ -28,8 +28,10 @@ contract and the locally persisted fields that accompany it.
   through today.
 - The selected range is used unchanged for sync and export. The dashboard table
   and charts load all persisted local history, initially show the selected
-  newest window, and provide scrollbars for older days. Partial weeks remain
-  visible. Weekly table summary rows are optional and enabled by default.
+  newest window, and provide scrollbars for older days. The table uses a fixed
+  four-week-height viewport of about 32 rows, independent of the selected range.
+  Partial weeks remain visible. Weekly table summary rows are optional and
+  enabled by default.
 - The automatic daily sync remains configurable from 1-90 days.
 - Google Health daily rollups use closed-open civil-date ranges aligned to the requested days.
 - Rollup requests are chunked in 14-day windows to stay inside stricter Google Health range limits for affected data types.

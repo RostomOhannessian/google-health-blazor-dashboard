@@ -25,7 +25,14 @@ collide with that:
    `LocalRequestPolicy` now accepts an opt-in
    `LocalRequestPolicy:TrustedNetworks` CIDR allowlist for exactly this case;
    it is empty (loopback-only) unless you configure it, so normal, non-Docker
-   use is unaffected.
+   use is unaffected. The allowlist is validated at startup and only accepts
+   private, loopback, or link-local ranges - a public or catch-all range such
+   as `0.0.0.0/0` is refused and logged rather than honored.
+
+   To keep that widening contained, `docker-compose.yml` publishes both ports
+   on the host's loopback interface (`127.0.0.1:5001:5001`) instead of every
+   interface. Without that, any machine on your LAN could reach the dashboard,
+   and one inside the trusted bridge range would pass the request gate.
 2. **The HTTPS dev certificate lives in your Windows/macOS/Linux certificate
    store, not in the container.** Containers start from a clean Linux
    filesystem, so Kestrel has no certificate to serve HTTPS with until you
@@ -253,14 +260,23 @@ docker compose up -d
 
 ## Security notes
 
+- Ports are published on `127.0.0.1` only, so the dashboard is reachable from
+  this machine's browser but not from anywhere else on your network. If you
+  change that to a bare `5001:5001`, you expose an unauthenticated personal
+  health dashboard to every host on the LAN - a machine whose address happens
+  to fall inside `DOCKER_TRUSTED_NETWORK` would then also pass the request gate.
 - The trusted-network allowlist only ever widens the request gate to
   Docker's own private bridge address space (or the single gateway address
-  you narrow it to in step 7) - never to the public internet. It is opt-in
-  and empty by default outside of this compose file.
-- Do not publish the container's ports on a shared or untrusted network
-  interface, and do not widen `DOCKER_TRUSTED_NETWORK` beyond what your
-  Docker networking actually requires. This remains a personal,
-  localhost-facing dashboard - see `SECURITY.md`.
+  you narrow it to in step 7) - never to the public internet. Startup
+  validation enforces this: entries outside private, loopback, or link-local
+  space are dropped with a warning, so a typo like `0.0.0.0/0` fails closed.
+  Watch for `Ignoring LocalRequestPolicy:TrustedNetworks entry` in the logs if
+  the dashboard unexpectedly returns `403`.
+- The container runs as the non-root `app` user with `no-new-privileges` and
+  all Linux capabilities dropped.
+- The database and the Data Protection key-ring volume are jointly equivalent
+  to your Google tokens. Anyone who can read both can decrypt them, so treat
+  those volumes as secret material.
 - Never commit `.env`; it can hold your certificate password and Google
   client secret.
 
@@ -268,7 +284,7 @@ docker compose up -d
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| `403 Forbidden` / "Health Metrics only accepts localhost requests" in logs | `DOCKER_TRUSTED_NETWORK` missing or wrong | Confirm `.env` has `DOCKER_TRUSTED_NETWORK` set and recreate with `docker compose up -d` |
+| `403 Forbidden` / "Health Metrics only accepts localhost requests" in logs | `DOCKER_TRUSTED_NETWORK` missing, wrong, or rejected as too broad | Confirm `.env` has `DOCKER_TRUSTED_NETWORK` set to a private range and recreate with `docker compose up -d`. Check the logs for `Ignoring LocalRequestPolicy:TrustedNetworks entry`, which means the value was refused for reaching outside private address space |
 | Container exits immediately mentioning `Kestrel` and certificates | `DEV_CERT_DIR`/`DEV_CERT_PASSWORD` missing, wrong path, or wrong password | Re-check step 3/4; `DEV_CERT_DIR` must point at the folder containing `aspnetcore-dev-cert.pfx`, using forward slashes |
 | `docker compose up` fails with "Set DEV_CERT_DIR/DEV_CERT_PASSWORD in .env" | `.env` was not created or is missing a required value | Redo step 4; both variables are required, unlike the optional Google credentials |
 | Browser shows a certificate warning | The exported cert is trusted by the OS but the browser has its own store, or you exported a different certificate than the one you trust | Rerun `dotnet dev-certs https --trust` first, then redo step 3 |

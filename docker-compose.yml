@@ -7,15 +7,23 @@ services:
     container_name: health-metrics
     restart: unless-stopped
     ports:
-      - "5001:5001" # https://localhost:5001 - matches the documented OAuth callback host/port
-      - "5000:5000" # http companion; redirects to https
+      # Bound to the host loopback interface only. A bare "5001:5001" would publish
+      # on every host interface, exposing an unauthenticated personal health
+      # dashboard to the whole LAN. The browser still reaches it at
+      # https://localhost:5001, and the container still sees the bridge gateway
+      # as the source address, so LocalRequestPolicy__TrustedNetworks is still required.
+      - "127.0.0.1:5001:5001" # https://localhost:5001 - matches the documented OAuth callback host/port
+      - "127.0.0.1:5000:5000" # http companion; redirects to https
 
     # Optional Google OAuth credentials live in .env and are passed through
     # verbatim. If GoogleHealthApi__ClientId/ClientSecret are not present in
     # .env at all, the app falls back to the tracked appsettings.json
     # placeholders and starts normally in demo mode. See docs/docker-setup.md.
+    # Marked optional so a missing .env surfaces the actionable
+    # "Set DEV_CERT_DIR in .env" message below rather than a raw file error.
     env_file:
-      - .env
+      - path: .env
+        required: false
 
     environment:
       # Fixed, non-secret, and must match the Google Cloud OAuth client
@@ -32,6 +40,14 @@ services:
       # Docker's standard private bridge address space; narrow it to your
       # exact gateway if you want a tighter allowlist (see docs/docker-setup.md).
       LocalRequestPolicy__TrustedNetworks__0: ${DOCKER_TRUSTED_NETWORK:-172.16.0.0/12}
+
+    # Runtime hardening. The image already runs as the non-root "app" user; these
+    # drop the remaining ambient privileges the app never needs. curl (the
+    # healthcheck) and Kestrel both work without any capability.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
 
     volumes:
       # Named volumes so the SQLite database, rolling logs, and the Data

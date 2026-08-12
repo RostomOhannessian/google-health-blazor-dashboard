@@ -11,6 +11,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HealthMetrics.Tests.Web;
 
@@ -390,6 +391,68 @@ public sealed class HealthEndpointTests
         context.Connection.RemoteIpAddress = IPAddress.Parse("172.20.0.5");
 
         Assert.False(LocalRequestPolicy.IsLocal(context, []));
+    }
+
+    [Theory]
+    [InlineData("172.16.0.0/12")]
+    [InlineData("172.18.0.1/32")]
+    [InlineData("10.0.0.0/8")]
+    [InlineData("192.168.1.0/24")]
+    [InlineData("127.0.0.0/8")]
+    [InlineData("fc00::/7")]
+    public void ParseTrustedNetworks_AcceptsPrivateRanges(string rawNetwork)
+    {
+        var parsed = LocalRequestPolicy.ParseTrustedNetworks(
+            [rawNetwork],
+            NullLogger.Instance);
+
+        Assert.Equal(IPNetwork.Parse(rawNetwork), Assert.Single(parsed));
+    }
+
+    [Theory]
+    [InlineData("0.0.0.0/0")]      // every IPv4 address
+    [InlineData("::/0")]           // every IPv6 address
+    [InlineData("172.0.0.0/8")]    // starts private but widens past 172.16.0.0/12
+    [InlineData("203.0.113.7/32")] // public address
+    [InlineData("8.8.8.8/32")]     // public address
+    [InlineData("not-a-cidr")]
+    [InlineData("172.16.0.0")]     // missing prefix length
+    public void ParseTrustedNetworks_RejectsPublicOrOverlyBroadRanges(string rawNetwork)
+    {
+        var parsed = LocalRequestPolicy.ParseTrustedNetworks(
+            [rawNetwork],
+            NullLogger.Instance);
+
+        Assert.Empty(parsed);
+    }
+
+    [Fact]
+    public void ParseTrustedNetworks_KeepsValidEntriesWhenOthersAreRejected()
+    {
+        var parsed = LocalRequestPolicy.ParseTrustedNetworks(
+            ["0.0.0.0/0", "172.18.0.1/32", "bogus"],
+            NullLogger.Instance);
+
+        Assert.Equal(IPNetwork.Parse("172.18.0.1/32"), Assert.Single(parsed));
+    }
+
+    [Fact]
+    public void ParseTrustedNetworks_ReturnsEmptyWhenNotConfigured()
+    {
+        Assert.Empty(LocalRequestPolicy.ParseTrustedNetworks(null, NullLogger.Instance));
+        Assert.Empty(LocalRequestPolicy.ParseTrustedNetworks([], NullLogger.Instance));
+    }
+
+    [Fact]
+    public void ParseTrustedNetworks_RejectedRangeDoesNotGrantAccess()
+    {
+        var context = new DefaultHttpContext();
+        context.Connection.RemoteIpAddress = IPAddress.Parse("203.0.113.7");
+        var trustedNetworks = LocalRequestPolicy.ParseTrustedNetworks(
+            ["0.0.0.0/0"],
+            NullLogger.Instance);
+
+        Assert.False(LocalRequestPolicy.IsLocal(context, trustedNetworks));
     }
 
     [Theory]

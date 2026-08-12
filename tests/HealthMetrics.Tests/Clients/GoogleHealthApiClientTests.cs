@@ -432,6 +432,96 @@ public sealed class GoogleHealthApiClientTests
         Assert.DoesNotContain("access-token-secret", messages);
     }
 
+    [Fact]
+    public async Task FetchDailyMetricsAsync_DoesNotRescaleComputedSleepEfficiencyBelowOnePercent()
+    {
+        // 2 of 300 minutes asleep is 0.67%, which lands in the 0-1 band the client uses
+        // to detect a provider-supplied fraction. A computed value is already a
+        // percentage and must not be multiplied by 100 a second time.
+        var handler = new StubHttpMessageHandler(request =>
+        {
+            var path = request.RequestUri!.ToString();
+            if (path.Contains("users/me/settings"))
+                return Json("""{"timeZone":"UTC"}""");
+
+            if (path.Contains("dataTypes/sleep/dataPoints"))
+                return Json("""
+                    {
+                      "dataPoints": [
+                        {
+                          "value": {
+                            "sleep": {
+                              "interval": {
+                                "civilStartTime": {"date": {"year": 2026, "month": 7, "day": 17}},
+                                "civilEndTime": {"date": {"year": 2026, "month": 7, "day": 18}}
+                              },
+                              "metadata": {"mainSleep": true},
+                              "summary": {
+                                "minutesAsleep": "2",
+                                "minutesInSleepPeriod": "300"
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    }
+                    """);
+
+            return Json("""{}""");
+        });
+
+        var snapshots = await CreateClient(handler).FetchDailyMetricsAsync(
+            "token",
+            new DateOnly(2026, 7, 18),
+            new DateOnly(2026, 7, 18),
+            CancellationToken.None);
+
+        var snapshot = Assert.Single(snapshots);
+        Assert.Equal(0.67m, snapshot.SleepEfficiency);
+    }
+
+    [Fact]
+    public async Task FetchDailyMetricsAsync_ScalesProviderSuppliedFractionalSleepEfficiency()
+    {
+        var handler = new StubHttpMessageHandler(request =>
+        {
+            var path = request.RequestUri!.ToString();
+            if (path.Contains("users/me/settings"))
+                return Json("""{"timeZone":"UTC"}""");
+
+            if (path.Contains("dataTypes/sleep/dataPoints"))
+                return Json("""
+                    {
+                      "dataPoints": [
+                        {
+                          "value": {
+                            "sleep": {
+                              "interval": {
+                                "civilStartTime": {"date": {"year": 2026, "month": 7, "day": 17}},
+                                "civilEndTime": {"date": {"year": 2026, "month": 7, "day": 18}}
+                              },
+                              "metadata": {"mainSleep": true},
+                              "summary": {"sleepEfficiency": 0.82}
+                            }
+                          }
+                        }
+                      ]
+                    }
+                    """);
+
+            return Json("""{}""");
+        });
+
+        var snapshots = await CreateClient(handler).FetchDailyMetricsAsync(
+            "token",
+            new DateOnly(2026, 7, 18),
+            new DateOnly(2026, 7, 18),
+            CancellationToken.None);
+
+        var snapshot = Assert.Single(snapshots);
+        Assert.Equal(82m, snapshot.SleepEfficiency);
+    }
+
     private static GoogleHealthApiClient CreateClient(
         HttpMessageHandler handler,
         GoogleHealthHttpLoggingOptions? options = null,

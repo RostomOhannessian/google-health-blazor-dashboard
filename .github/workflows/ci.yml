@@ -8,6 +8,10 @@ on:
     branches:
       - master
 
+# Least privilege: CI only reads the repository. Any job needing more must opt in.
+permissions:
+  contents: read
+
 jobs:
   build-test:
     runs-on: ubuntu-latest
@@ -29,6 +33,19 @@ jobs:
 
       - name: Test
         run: dotnet test ./HealthMetrics.slnx --configuration Release --no-build --verbosity minimal
+
+      # This repo pins SQLitePCLRaw and System.Security.Cryptography.Xml to escape
+      # known advisories. Fail the build if a new advisory appears (or a pin is
+      # dropped) instead of finding out by hand. `dotnet list` exits 0 either way,
+      # so the output has to be inspected.
+      - name: Scan for vulnerable dependencies
+        run: |
+          dotnet list ./HealthMetrics.slnx package --vulnerable --include-transitive 2>&1 | tee vulnerable.log
+          if grep -q "has the following vulnerable packages" vulnerable.log; then
+            echo "::error::Vulnerable NuGet packages detected."
+            exit 1
+          fi
+          echo "No vulnerable packages detected."
 
   docker-build:
     runs-on: ubuntu-latest

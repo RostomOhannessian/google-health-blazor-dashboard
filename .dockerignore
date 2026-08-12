@@ -4,6 +4,7 @@
 **/.vs/
 **/.vscode/
 **/.idea/
+**/*.user
 **/TestResults/
 **/*.trx
 **/*.coverage

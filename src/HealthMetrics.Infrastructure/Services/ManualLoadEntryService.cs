@@ -17,6 +17,11 @@ internal sealed class ManualLoadEntryService(HealthMetricsDbContext dbContext) :
 
         return await SnapshotMutationCoordinator.RunAsync(async () =>
         {
+            // The entry and the ACWR recalculation it invalidates are two SaveChanges
+            // calls, so they need one transaction: without it a failure in the second
+            // leaves stored load values with stale ACWR alongside them.
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+
             var weekStart = WeeklyLoadCalculator.GetWeekStart(entry.MetricDate);
             var weekEnd = weekStart.AddDays(6);
             var weeklySnapshots = await dbContext.DailyMetricSnapshots
@@ -73,6 +78,8 @@ internal sealed class ManualLoadEntryService(HealthMetricsDbContext dbContext) :
                 .ToListAsync(cancellationToken);
             AcwrCalculator.RecalculateManualCardioLoad(snapshots);
             await dbContext.SaveChangesAsync(cancellationToken);
+
+            await transaction.CommitAsync(cancellationToken);
 
             return ManualLoadEntryResult.Success;
         }, cancellationToken);

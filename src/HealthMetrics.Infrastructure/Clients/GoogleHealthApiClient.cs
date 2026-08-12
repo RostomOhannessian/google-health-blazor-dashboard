@@ -23,6 +23,13 @@ internal sealed class GoogleHealthApiClient(
         RegexOptions.Compiled,
         TimeSpan.FromMilliseconds(100));
 
+    /// <summary>
+    /// Upper bound on pages followed for a single paginated fetch. A provider that keeps
+    /// returning a nextPageToken (or repeats one) would otherwise spin forever issuing
+    /// requests, so the loop stops and logs instead of hanging the sync.
+    /// </summary>
+    private const int MaxPagesPerFetch = 500;
+
     private readonly GoogleHealthHttpLoggingOptions _loggingOptions = loggingOptions.Value;
 
     public async Task<string> GetIdentityAsync(string accessToken, CancellationToken cancellationToken)
@@ -171,6 +178,15 @@ internal sealed class GoogleHealthApiClient(
             pageToken = FindString(doc.RootElement, "nextPageToken") ?? string.Empty;
             if (!string.IsNullOrWhiteSpace(pageToken))
                 logger.LogDebug("Google Health daily list fetch for {DataType} has another page.", dataType);
+
+            if (pageCount >= MaxPagesPerFetch && !string.IsNullOrWhiteSpace(pageToken))
+            {
+                logger.LogWarning(
+                    "Google Health daily list fetch for {DataType} stopped at the {MaxPages}-page safety limit; results may be incomplete.",
+                    dataType,
+                    MaxPagesPerFetch);
+                break;
+            }
         }
         while (!string.IsNullOrWhiteSpace(pageToken));
 
@@ -250,6 +266,7 @@ internal sealed class GoogleHealthApiClient(
         var exclusiveEndDate = endDate.AddDays(1);
         var filter = $"sleep.interval.civil_end_time >= \"{startDate:yyyy-MM-dd}\" AND sleep.interval.civil_end_time < \"{exclusiveEndDate:yyyy-MM-dd}\"";
         var pageToken = string.Empty;
+        var sleepPageCount = 0;
         var candidates = new Dictionary<DateOnly, SleepMetrics>();
 
         do
@@ -260,6 +277,7 @@ internal sealed class GoogleHealthApiClient(
                 path.Append("&pageToken=").Append(Uri.EscapeDataString(pageToken));
 
             using var doc = await SendJsonAsync(HttpMethod.Get, path.ToString(), accessToken, null, cancellationToken);
+            sleepPageCount++;
             foreach (var point in ReadDataPoints(doc.RootElement))
             {
                 if (!TryReadSleepMetrics(point, out var sleepMetrics)
@@ -277,6 +295,14 @@ internal sealed class GoogleHealthApiClient(
             }
 
             pageToken = FindString(doc.RootElement, "nextPageToken") ?? string.Empty;
+
+            if (sleepPageCount >= MaxPagesPerFetch && !string.IsNullOrWhiteSpace(pageToken))
+            {
+                logger.LogWarning(
+                    "Google Health sleep fetch stopped at the {MaxPages}-page safety limit; results may be incomplete.",
+                    MaxPagesPerFetch);
+                break;
+            }
         }
         while (!string.IsNullOrWhiteSpace(pageToken));
 
@@ -429,7 +455,19 @@ internal sealed class GoogleHealthApiClient(
 
     private string SanitizeAndTruncate(string value)
     {
-        var sanitized = SensitiveJsonPropertyPattern.Replace(value, "$1[redacted]$3");
+        string sanitized;
+        try
+        {
+            sanitized = SensitiveJsonPropertyPattern.Replace(value, "$1[redacted]$3");
+        }
+        catch (RegexMatchTimeoutException)
+        {
+            // Redaction is best-effort but must never be skipped: an unsanitized body
+            // could carry a bearer token. Diagnostics also must never break a sync, so
+            // drop the body instead of letting the timeout escape into the request path.
+            return "[redacted: sanitizer timed out]";
+        }
+
         if (_loggingOptions.MaxBodyCharacters <= 0 || sanitized.Length <= _loggingOptions.MaxBodyCharacters)
             return sanitized;
 
@@ -546,7 +584,7 @@ internal sealed class GoogleHealthApiClient(
             ?? (summary is null ? null : ReadDecimal(summary.Value, "sleepEfficiency", "sleep_efficiency", "efficiency"));
         if (efficiency is null && minutesAsleep is > 0 && minutesInSleepPeriod is > 0)
             efficiency = minutesAsleep.Value / minutesInSleepPeriod.Value * 100;
-        if (efficiency is not null && efficiency is >= 0 and <= 1)
+        else if (efficiency is >= 0 and <= 1)
             efficiency *= 100;
 
         metrics = new SleepMetrics(

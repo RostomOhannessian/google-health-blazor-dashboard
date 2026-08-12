@@ -91,6 +91,8 @@ internal sealed class MetricQueryService(HealthMetricsDbContext dbContext) : IMe
         int count = 10,
         CancellationToken cancellationToken = default)
     {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(count);
+
         return await dbContext.SyncHistory
             .AsNoTracking()
             .Where(entry => entry.UserKey == LocalUser.Key)

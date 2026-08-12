@@ -152,7 +152,21 @@ internal sealed class GoogleHealthSyncService(
             historyEntry.CompletedAtUtc = DateTimeOffset.UtcNow;
             historyEntry.Outcome = SyncOutcome.Failed;
             historyEntry.ErrorMessage = ex.Message;
-            await dbContext.SaveChangesAsync(CancellationToken.None);
+
+            // Recorded with CancellationToken.None so a cancelled sync still leaves a
+            // history row. Failures here are swallowed on purpose: letting SaveChanges
+            // throw would replace the original exception and hide the real cause.
+            try
+            {
+                await dbContext.SaveChangesAsync(CancellationToken.None);
+            }
+            catch (Exception saveException)
+            {
+                logger.LogError(
+                    saveException,
+                    "Failed to persist the Google Health sync failure record. SyncHistoryEntryId: {SyncHistoryEntryId}.",
+                    historyEntry.Id);
+            }
 
             logger.LogError(
                 ex,

@@ -68,6 +68,12 @@ Then open `https://localhost:5001`. The HTTP companion is `http://localhost:5000
 and redirects to HTTPS. The app rejects non-loopback requests at runtime because
 it is a single-user local dashboard.
 
+There is no user authentication: reaching the app from this machine is the whole
+authorization model. `SECURITY.md` documents what enforces that (the loopback
+request gate, the restricted `AllowedHosts` list, loopback-only container port
+publishing, and how OAuth tokens are stored) and is worth reading before you
+change any of it.
+
 ## Test
 
 ```powershell
@@ -87,6 +93,7 @@ dotnet test .\HealthMetrics.slnx
 | `docs/local-development.md` | Local prerequisites, commands, files, and troubleshooting |
 | `docs/google-health-setup.md` | Google Cloud, Fitbit data, OAuth, and live sync setup |
 | `docs/docker-setup.md` | Docker/Compose host setup, HTTPS certificates, and persistence |
+| `SECURITY.md` | Trust model, request gate, secret handling, and reporting |
 | `Dockerfile`, `docker-compose.yml`, `.env.example` | Container image and Compose stack definition |
 
 Secrets belong in .NET user-secrets or environment variables, never in tracked

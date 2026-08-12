@@ -1,0 +1,33 @@
+# Build output and IDE/tooling artifacts never belong in the image.
+**/bin/
+**/obj/
+**/.vs/
+**/.vscode/
+**/.idea/
+**/TestResults/
+**/*.trx
+**/*.coverage
+**/*.coveragexml
+
+# Local runtime data, logs, and secrets must never be baked into the image.
+**/logs/
+**/*.db
+**/*.db-shm
+**/*.db-wal
+.env
+.env.*
+!.env.example
+appsettings.Local.json
+
+# Not needed to build or run the published Web app.
+.git/
+.github/
+.vs/
+tests/
+docs/
+*.md
+
+# Docker's own files don't need to be in the build context.
+Dockerfile
+docker-compose.yml
+.dockerignore

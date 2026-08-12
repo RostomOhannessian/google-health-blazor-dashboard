@@ -360,6 +360,39 @@ public sealed class HealthEndpointTests
     }
 
     [Theory]
+    [InlineData("172.20.0.5", true)]
+    [InlineData("::ffff:172.20.0.5", true)]
+    [InlineData("10.0.0.5", false)]
+    [InlineData("203.0.113.7", false)]
+    public void LocalRequestPolicy_RecognizesConfiguredTrustedNetworks(string remoteIpAddress, bool expected)
+    {
+        var context = new DefaultHttpContext();
+        context.Connection.RemoteIpAddress = IPAddress.Parse(remoteIpAddress);
+        var trustedNetworks = new[] { IPNetwork.Parse("172.16.0.0/12") };
+
+        Assert.Equal(expected, LocalRequestPolicy.IsLocal(context, trustedNetworks));
+    }
+
+    [Fact]
+    public void LocalRequestPolicy_StillRecognizesLoopbackWhenTrustedNetworksConfigured()
+    {
+        var context = new DefaultHttpContext();
+        context.Connection.RemoteIpAddress = IPAddress.Loopback;
+        var trustedNetworks = new[] { IPNetwork.Parse("172.16.0.0/12") };
+
+        Assert.True(LocalRequestPolicy.IsLocal(context, trustedNetworks));
+    }
+
+    [Fact]
+    public void LocalRequestPolicy_RejectsNonLoopbackWhenNoTrustedNetworksConfigured()
+    {
+        var context = new DefaultHttpContext();
+        context.Connection.RemoteIpAddress = IPAddress.Parse("172.20.0.5");
+
+        Assert.False(LocalRequestPolicy.IsLocal(context, []));
+    }
+
+    [Theory]
     [InlineData("/api/health/disconnect")]
     [InlineData("/api/health/sync?days=7")]
     [InlineData("/api/demo/seed?days=30")]

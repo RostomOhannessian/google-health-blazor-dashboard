@@ -1,0 +1,60 @@
+services:
+  health-metrics:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: health-metrics-dashboard:local
+    container_name: health-metrics
+    restart: unless-stopped
+    ports:
+      - "5001:5001" # https://localhost:5001 - matches the documented OAuth callback host/port
+      - "5000:5000" # http companion; redirects to https
+
+    # Optional Google OAuth credentials live in .env and are passed through
+    # verbatim. If GoogleHealthApi__ClientId/ClientSecret are not present in
+    # .env at all, the app falls back to the tracked appsettings.json
+    # placeholders and starts normally in demo mode. See docs/docker-setup.md.
+    env_file:
+      - .env
+
+    environment:
+      # Fixed, non-secret, and must match the Google Cloud OAuth client
+      # exactly, so it is set unconditionally rather than sourced from .env.
+      GoogleHealthApi__RedirectUri: https://localhost:5001/api/health/callback
+
+      # HTTPS dev certificate exported to the host folder referenced below.
+      ASPNETCORE_Kestrel__Certificates__Default__Path: /https/aspnetcore-dev-cert.pfx
+      ASPNETCORE_Kestrel__Certificates__Default__Password: ${DEV_CERT_PASSWORD:?Set DEV_CERT_PASSWORD in .env - see docs/docker-setup.md}
+
+      # The app rejects non-loopback requests by default. A published port
+      # is reached through the Docker bridge gateway, not loopback, so that
+      # gateway address must be explicitly trusted. The default below covers
+      # Docker's standard private bridge address space; narrow it to your
+      # exact gateway if you want a tighter allowlist (see docs/docker-setup.md).
+      LocalRequestPolicy__TrustedNetworks__0: ${DOCKER_TRUSTED_NETWORK:-172.16.0.0/12}
+
+    volumes:
+      # Named volumes so the SQLite database, rolling logs, and the Data
+      # Protection key ring (which decrypts stored Google OAuth tokens)
+      # survive container recreation and image rebuilds.
+      - health-metrics-data:/app/data
+      - health-metrics-logs:/app/logs
+      - health-metrics-dp-keys:/home/app/.aspnet/DataProtection-Keys
+      # Read-only bind mount of the host folder holding the exported dev
+      # certificate (see docs/docker-setup.md for the export command).
+      - ${DEV_CERT_DIR:?Set DEV_CERT_DIR in .env - see docs/docker-setup.md}:/https:ro
+
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--insecure", "https://localhost:5001/api/health/status"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+
+volumes:
+  health-metrics-data:
+    name: health-metrics-data
+  health-metrics-logs:
+    name: health-metrics-logs
+  health-metrics-dp-keys:
+    name: health-metrics-dp-keys

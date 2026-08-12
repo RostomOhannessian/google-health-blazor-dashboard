@@ -43,6 +43,8 @@ For recruiters and engineers evaluating the project, useful places to start are:
    commands, database, logs, and troubleshooting.
 3. Follow [Google Health setup](docs/google-health-setup.md) only when you
    want live Google authorization and synchronization.
+4. Prefer a container instead? Follow [Docker setup](docs/docker-setup.md)
+   to build and run the same dashboard with Docker Compose.
 
 The documented HTTPS profile is:
 
@@ -84,6 +86,8 @@ dotnet test .\HealthMetrics.slnx
 | `docs/google-health-data-contract.md` | Google Health to dashboard mapping |
 | `docs/local-development.md` | Local prerequisites, commands, files, and troubleshooting |
 | `docs/google-health-setup.md` | Google Cloud, Fitbit data, OAuth, and live sync setup |
+| `docs/docker-setup.md` | Docker/Compose host setup, HTTPS certificates, and persistence |
+| `Dockerfile`, `docker-compose.yml`, `.env.example` | Container image and Compose stack definition |
 
 Secrets belong in .NET user-secrets or environment variables, never in tracked
 JSON. The app creates and migrates its local database automatically.

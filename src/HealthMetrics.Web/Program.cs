@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using HealthMetrics.Application.Exceptions;
@@ -64,6 +65,9 @@ try
     }
 
     var allowMissingRemoteIp = app.Configuration.GetValue<bool>("LocalRequestPolicy:AllowMissingRemoteIp");
+    var trustedNetworks = ParseTrustedNetworks(
+        app.Configuration.GetSection("LocalRequestPolicy:TrustedNetworks").Get<string[]>(),
+        startupLogger);
 
     app.Use(async (context, next) =>
     {
@@ -73,7 +77,7 @@ try
             return;
         }
 
-        if (LocalRequestPolicy.IsLocal(context))
+        if (LocalRequestPolicy.IsLocal(context, trustedNetworks))
         {
             await next();
             return;
@@ -245,6 +249,38 @@ finally
 }
 
 static string GetStateCacheKey(string state) => $"google-health-oauth-state:{state}";
+
+static IReadOnlyList<IPNetwork> ParseTrustedNetworks(string[]? rawNetworks, Microsoft.Extensions.Logging.ILogger logger)
+{
+    if (rawNetworks is null || rawNetworks.Length == 0)
+    {
+        return [];
+    }
+
+    var parsedNetworks = new List<IPNetwork>(rawNetworks.Length);
+    foreach (var rawNetwork in rawNetworks)
+    {
+        if (IPNetwork.TryParse(rawNetwork, out var network))
+        {
+            parsedNetworks.Add(network);
+        }
+        else
+        {
+            logger.LogWarning(
+                "Ignoring invalid LocalRequestPolicy:TrustedNetworks entry {RawNetwork}. Use CIDR notation, e.g. 172.16.0.0/12.",
+                rawNetwork);
+        }
+    }
+
+    if (parsedNetworks.Count > 0)
+    {
+        logger.LogInformation(
+            "Local request policy will also trust {TrustedNetworkCount} configured network(s) in addition to loopback.",
+            parsedNetworks.Count);
+    }
+
+    return parsedNetworks;
+}
 
 static MetricDateRange? TryGetMetricDateRange(int? days, DateOnly? endDate, int defaultDayCount)
 {

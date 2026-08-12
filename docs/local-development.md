@@ -2,7 +2,9 @@
 
 This guide gets a developer who knows C# but has not used this stack before
 from a clean checkout to a working local dashboard. It covers the repository
-tools and operating model, not C# syntax or IDE navigation.
+tools and operating model, not C# syntax or IDE navigation. Prefer a
+container instead of installing the SDK locally? See
+[Docker setup](docker-setup.md).
 
 ## What you are running
 

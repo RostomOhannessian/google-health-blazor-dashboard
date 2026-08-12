@@ -332,14 +332,15 @@
     <div class="modal-backdrop fade show"></div>
 }
 
-@if (HasHeartMetrics || HasLoadMetrics)
+@if (HasHeartMetrics || HasLoadMetrics || HasConsumptionMetrics)
 {
     <div class="card mb-4">
         <div class="card-header d-flex align-items-center justify-content-between gap-2 flex-wrap">
-            <span class="fw-semibold">@(chartMode == ChartMode.Load ? "Daily Cardio Load & weekly accumulation" : "Heart rate & HRV trend")</span>
+            <span class="fw-semibold">@ChartTitle</span>
             <div class="btn-group btn-group-sm" role="group" aria-label="Chart metric">
                 <button type="button" class="btn @(chartMode == ChartMode.Heart ? "btn-primary" : "btn-outline-primary")" @onclick="@(() => SetChartModeAsync(ChartMode.Heart))" disabled="@(!HasHeartMetrics)">Heart &amp; HRV</button>
                 <button type="button" class="btn @(chartMode == ChartMode.Load ? "btn-primary" : "btn-outline-primary")" @onclick="@(() => SetChartModeAsync(ChartMode.Load))" disabled="@(!HasLoadMetrics)">Load</button>
+                <button type="button" class="btn @(chartMode == ChartMode.Consumption ? "btn-primary" : "btn-outline-primary")" @onclick="@(() => SetChartModeAsync(ChartMode.Consumption))" disabled="@(!HasConsumptionMetrics)">Consumption</button>
             </div>
         </div>
         <div class="card-body chart-card-body py-2">
@@ -417,13 +418,16 @@
                 <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("carbs"))">Carbs (g) @SortIndicator("carbs")</button></th>
                 <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("fat"))">Fat (g) @SortIndicator("fat")</button></th>
                 <th><button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("protein"))">Protein (g) @SortIndicator("protein")</button></th>
+                <th title="Estimated from calories left after carbohydrate, fat, and protein. Residuals below 10 g are shown as zero.">
+                    <button type="button" class="btn btn-link p-0 text-reset text-decoration-none" @onclick="@(() => SortBy("alcohol"))">Alcohol est. (g) @SortIndicator("alcohol")</button>
+                </th>
             </tr>
         </thead>
         <tbody>
             @if (allMetrics.Count == 0)
             {
                 <tr>
-                    <td colspan="13" class="text-center text-muted py-3">
+                    <td colspan="14" class="text-center text-muted py-3">
                         @(connectionStatus?.IsConnected == true
                                 ? "No data for this range — run a sync first."
                                 : "Connect Google Health and run sync to start tracking.")
@@ -458,6 +462,7 @@
                             <td>@Display(metric.CarbohydratesGrams, "F2")</td>
                             <td>@Display(metric.FatGrams, "F2")</td>
                             <td>@Display(metric.ProteinGrams, "F2")</td>
+                            <td>@Display(metric.EstimatedAlcoholGrams, "F2")</td>
                         </tr>
                     }
                     @if (ShouldShowWeeklySummary)
@@ -480,6 +485,7 @@
                             <td>@Display(weeklyGroup.Averages.CarbohydratesGrams, "F2")</td>
                             <td>@Display(weeklyGroup.Averages.FatGrams, "F2")</td>
                             <td>@Display(weeklyGroup.Averages.ProteinGrams, "F2")</td>
+                            <td>@Display(weeklyGroup.Averages.EstimatedAlcoholGrams, "F2")</td>
                         </tr>
                     }
                 }
@@ -590,6 +596,20 @@
             || m.TargetLoad.HasValue
             || m.Acwr.HasValue);
 
+    private bool HasConsumptionMetrics =>
+        allMetrics.Any(m => m.ConsumedCaloriesKcal.HasValue
+            || m.CarbohydratesGrams.HasValue
+            || m.FatGrams.HasValue
+            || m.ProteinGrams.HasValue
+            || m.EstimatedAlcoholGrams.HasValue);
+
+    private string ChartTitle => chartMode switch
+    {
+        ChartMode.Load => "Daily Cardio Load & weekly accumulation",
+        ChartMode.Consumption => "Nutrition consumption",
+        _ => "Heart rate & HRV trend"
+    };
+
     private bool IsYearToDate => selectedRange == MetricRange.YearToDate;
 
     private MetricDateRange SelectedDateRange =>
@@ -625,6 +645,7 @@
             "carbs" => Sort(allMetrics, metric => metric.CarbohydratesGrams),
             "fat" => Sort(allMetrics, metric => metric.FatGrams),
             "protein" => Sort(allMetrics, metric => metric.ProteinGrams),
+            "alcohol" => Sort(allMetrics, metric => metric.EstimatedAlcoholGrams),
             _ => Sort(allMetrics, metric => metric.MetricDate)
         };
 
@@ -651,7 +672,12 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        var chartHasData = chartMode == ChartMode.Load ? HasLoadMetrics : HasHeartMetrics;
+        var chartHasData = chartMode switch
+        {
+            ChartMode.Load => HasLoadMetrics,
+            ChartMode.Consumption => HasConsumptionMetrics,
+            _ => HasHeartMetrics
+        };
         if (chartNeedsRender)
         {
             chartNeedsRender = false;
@@ -694,6 +720,38 @@
                 SelectedDayCount,
                 "metricsChartHistoryScroll");
         }
+        else if (chartMode == ChartMode.Consumption)
+        {
+            var labels = chartSnapshots
+                .Select(metric => metric.MetricDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture))
+                .ToArray();
+            var caloriesData = chartSnapshots
+                .Select(metric => (object?)metric.ConsumedCaloriesKcal)
+                .ToArray();
+            var carbohydratesData = chartSnapshots
+                .Select(metric => (object?)metric.CarbohydratesGrams)
+                .ToArray();
+            var fatData = chartSnapshots
+                .Select(metric => (object?)metric.FatGrams)
+                .ToArray();
+            var proteinData = chartSnapshots
+                .Select(metric => (object?)metric.ProteinGrams)
+                .ToArray();
+            var estimatedAlcoholData = chartSnapshots
+                .Select(metric => (object?)metric.EstimatedAlcoholGrams)
+                .ToArray();
+            await JS.InvokeVoidAsync(
+                "HealthCharts.renderConsumption",
+                "metricsChart",
+                labels,
+                caloriesData,
+                carbohydratesData,
+                fatData,
+                proteinData,
+                estimatedAlcoholData,
+                SelectedDayCount,
+                "metricsChartHistoryScroll");
+        }
         else
         {
             var labels = chartSnapshots
@@ -718,7 +776,9 @@
 
     private async Task SetChartModeAsync(ChartMode mode)
     {
-        if (mode == ChartMode.Load && !HasLoadMetrics)
+        if ((mode == ChartMode.Load && !HasLoadMetrics)
+            || (mode == ChartMode.Consumption && !HasConsumptionMetrics)
+            || (mode == ChartMode.Heart && !HasHeartMetrics))
             return;
 
         chartMode = mode;
@@ -782,10 +842,26 @@
             allMetrics.Clear();
             allMetrics.AddRange(loadedHistory);
             UpdateSelectedMetrics();
-            if (!HasHeartMetrics && HasLoadMetrics)
-                chartMode = ChartMode.Load;
+            if (!HasHeartMetrics)
+            {
+                chartMode = HasLoadMetrics
+                    ? ChartMode.Load
+                    : HasConsumptionMetrics
+                        ? ChartMode.Consumption
+                        : ChartMode.Heart;
+            }
             else if (chartMode == ChartMode.Load && !HasLoadMetrics)
-                chartMode = ChartMode.Heart;
+            {
+                chartMode = HasConsumptionMetrics
+                    ? ChartMode.Consumption
+                    : ChartMode.Heart;
+            }
+            else if (chartMode == ChartMode.Consumption && !HasConsumptionMetrics)
+            {
+                chartMode = HasLoadMetrics
+                    ? ChartMode.Load
+                    : ChartMode.Heart;
+            }
             var history = await MetricQueryService.GetRecentSyncHistoryAsync(10, _cts.Token);
             syncHistory.Clear();
             syncHistory.AddRange(history);
@@ -1263,7 +1339,8 @@
     private enum ChartMode
     {
         Heart,
-        Load
+        Load,
+        Consumption
     }
 
     private enum MetricRange

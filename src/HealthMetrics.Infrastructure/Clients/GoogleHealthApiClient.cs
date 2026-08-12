@@ -305,6 +305,7 @@ internal sealed class GoogleHealthApiClient(
             ?? ReadNestedDecimal(point, "fat", "gramsSum");
         snapshot.ProteinGrams = ReadNutrientGrams(point, "PROTEIN")
             ?? ReadNestedDecimal(point, "protein", "gramsSum");
+        NutritionEnergyEstimator.UpdateEstimatedAlcoholGrams(snapshot);
     }
 
     private async Task<JsonDocument> SendJsonAsync(

@@ -135,6 +135,7 @@ public sealed class GoogleHealthApiClientTests
         Assert.Equal(260.5m, snapshot.CarbohydratesGrams);
         Assert.Equal(70m, snapshot.FatGrams);
         Assert.Equal(120m, snapshot.ProteinGrams);
+        Assert.Equal(0m, snapshot.EstimatedAlcoholGrams);
     }
 
     [Fact]

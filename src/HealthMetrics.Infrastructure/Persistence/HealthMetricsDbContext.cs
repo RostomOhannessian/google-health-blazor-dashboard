@@ -54,6 +54,7 @@ public sealed class HealthMetricsDbContext(DbContextOptions<HealthMetricsDbConte
             entity.Property(snapshot => snapshot.CarbohydratesGrams).HasPrecision(9, 2);
             entity.Property(snapshot => snapshot.FatGrams).HasPrecision(9, 2);
             entity.Property(snapshot => snapshot.ProteinGrams).HasPrecision(9, 2);
+            entity.Property(snapshot => snapshot.EstimatedAlcoholGrams).HasPrecision(9, 2);
         });
 
         modelBuilder.Entity<SyncHistoryEntry>(entity =>

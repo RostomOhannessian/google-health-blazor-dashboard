@@ -73,7 +73,7 @@ public sealed class HealthEndpointTests
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("text/csv", response.Content.Headers.ContentType!.MediaType);
-        Assert.StartsWith("Date,RestingHR_bpm,HRV_RMSSD_ms,DailyVO2Max_ml_kg_min,RunVO2Max_ml_kg_min,ManualCardioLoad,ManualTargetLoad,ManualACWR,SleepEfficiency_pct,DeepSleep_min,RemSleep_min,Calories_kcal,Carbs_g,Fat_g,Protein_g", csv);
+        Assert.StartsWith("Date,RestingHR_bpm,HRV_RMSSD_ms,DailyVO2Max_ml_kg_min,RunVO2Max_ml_kg_min,ManualCardioLoad,ManualTargetLoad,ManualACWR,SleepEfficiency_pct,DeepSleep_min,RemSleep_min,Calories_kcal,Carbs_g,Fat_g,Protein_g,AlcoholEstimate_g", csv);
         Assert.DoesNotContain("Sodium", csv);
         Assert.DoesNotContain("Fiber", csv);
     }
@@ -82,7 +82,7 @@ public sealed class HealthEndpointTests
     public async Task MetricsExport_UsesInvariantCultureForDecimals()
     {
         // The fake metric query returns rows with decimal fields (HRV 42.5, Carbs 260.5 etc.).
-        // Each data row must have exactly 15 comma-separated columns regardless of the host
+        // Each data row must have exactly 16 comma-separated columns regardless of the host
         // locale. A comma-decimal locale would produce extra columns if formatting were
         // culture-dependent.
         await using var factory = new HealthMetricsWebApplicationFactory();
@@ -94,7 +94,7 @@ public sealed class HealthEndpointTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var lines = csv.Split('\n', StringSplitOptions.RemoveEmptyEntries);
         foreach (var line in lines.Skip(1)) // skip header
-            Assert.Equal(15, line.TrimEnd('\r').Split(',').Length);
+            Assert.Equal(16, line.TrimEnd('\r').Split(',').Length);
 
         Assert.Contains("42.5", csv);
         Assert.Contains("260.5", csv);
@@ -229,6 +229,8 @@ public sealed class HealthEndpointTests
         Assert.Contains("Manual Cardio Load", html);
         Assert.Contains("Double-click to edit manual load", html);
         Assert.Contains("Sleep Efficiency (%)", html);
+        Assert.Contains("Alcohol est. (g)", html);
+        Assert.Contains("0.00", html);
     }
 
     [Fact]
@@ -311,6 +313,11 @@ public sealed class HealthEndpointTests
         Assert.Contains("rgb(255, 193, 7)", script);
         Assert.Contains("formatCalendarDate", script);
         Assert.Contains("chartTooltipTitle", script);
+        Assert.Contains("renderConsumption", script);
+        Assert.Contains("Calories (kcal)", script);
+        Assert.Contains("Alcohol estimate (g)", script);
+        Assert.Contains("yCalories", script);
+        Assert.Contains("yGrams", script);
     }
 
     [Fact]
@@ -537,7 +544,8 @@ public sealed class HealthEndpointTests
             ConsumedCaloriesKcal = 2200,
             CarbohydratesGrams = 260.5m,
             FatGrams = 70m,
-            ProteinGrams = 120m
+            ProteinGrams = 120m,
+            EstimatedAlcoholGrams = 0m
         };
     }
 

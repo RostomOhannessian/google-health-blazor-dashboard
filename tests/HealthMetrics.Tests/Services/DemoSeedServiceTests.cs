@@ -128,6 +128,8 @@ public sealed class DemoSeedServiceTests : IAsyncLifetime
             Assert.InRange(s.DeepSleepMinutes!.Value, 45, 110);
             Assert.InRange(s.RemSleepMinutes!.Value, 70, 150);
             Assert.InRange(s.ConsumedCaloriesKcal!.Value, 1700, 2599);
+            Assert.NotNull(s.EstimatedAlcoholGrams);
+            Assert.True(s.EstimatedAlcoholGrams is 0m or >= 10m);
         }
 
         Assert.Contains(snapshots, snapshot => snapshot.Acwr is not null);

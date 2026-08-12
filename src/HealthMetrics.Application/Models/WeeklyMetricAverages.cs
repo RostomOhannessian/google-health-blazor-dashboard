@@ -13,7 +13,8 @@ public sealed record WeeklyMetricAverages(
     decimal? ConsumedCaloriesKcal,
     decimal? CarbohydratesGrams,
     decimal? FatGrams,
-    decimal? ProteinGrams)
+    decimal? ProteinGrams,
+    decimal? EstimatedAlcoholGrams)
 {
     public static WeeklyMetricAverages From(
         DateOnly weekStart,
@@ -33,7 +34,8 @@ public sealed record WeeklyMetricAverages(
             Average(values.Select(snapshot => (decimal?)snapshot.ConsumedCaloriesKcal)),
             Average(values.Select(snapshot => snapshot.CarbohydratesGrams)),
             Average(values.Select(snapshot => snapshot.FatGrams)),
-            Average(values.Select(snapshot => snapshot.ProteinGrams)));
+            Average(values.Select(snapshot => snapshot.ProteinGrams)),
+            Average(values.Select(snapshot => snapshot.EstimatedAlcoholGrams)));
     }
 
     private static decimal? Average(IEnumerable<decimal?> values)

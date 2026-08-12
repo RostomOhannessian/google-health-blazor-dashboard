@@ -79,6 +79,8 @@ internal sealed class GoogleHealthSyncService(
 
             foreach (var fetchedSnapshot in fetchedSnapshots)
             {
+                NutritionEnergyEstimator.UpdateEstimatedAlcoholGrams(fetchedSnapshot);
+
                 if (HasAnyMetricValue(fetchedSnapshot))
                     daysWithMetricValues++;
 
@@ -178,6 +180,7 @@ internal sealed class GoogleHealthSyncService(
         target.CarbohydratesGrams = source.CarbohydratesGrams ?? target.CarbohydratesGrams;
         target.FatGrams = source.FatGrams ?? target.FatGrams;
         target.ProteinGrams = source.ProteinGrams ?? target.ProteinGrams;
+        NutritionEnergyEstimator.UpdateEstimatedAlcoholGrams(target);
         target.CapturedAtUtc = source.CapturedAtUtc;
     }
 

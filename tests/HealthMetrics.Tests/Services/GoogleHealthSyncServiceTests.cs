@@ -139,6 +139,7 @@ public sealed class GoogleHealthSyncServiceTests : IAsyncLifetime
         Assert.Equal(200m, stored.CarbohydratesGrams);
         Assert.Equal(60m, stored.FatGrams);
         Assert.Equal(100m, stored.ProteinGrams);
+        Assert.Equal(37.14m, stored.EstimatedAlcoholGrams);
     }
 
     [Fact]

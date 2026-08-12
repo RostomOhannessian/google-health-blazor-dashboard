@@ -214,6 +214,43 @@ public sealed class HealthMetricsDbContextTests
             await ScalarAsync<string>(connection, "SELECT GoogleEmail FROM user_data_ownership LIMIT 1"));
     }
 
+    [Fact]
+    public async Task EstimatedAlcoholMigration_BackfillsSubstantialNutritionResidual()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<HealthMetricsDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using (var legacyContext = new HealthMetricsDbContext(options))
+        {
+            var migrator = legacyContext.GetService<IMigrator>();
+            await migrator.MigrateAsync("20260803205420_AddUserDataOwnershipBoundary");
+            await legacyContext.Database.ExecuteSqlRawAsync("""
+                INSERT INTO daily_metric_snapshots (
+                    UserKey, MetricDate, ConsumedCaloriesKcal, CarbohydratesGrams,
+                    FatGrams, ProteinGrams, CapturedAtUtc
+                ) VALUES (
+                    'local-user', '2026-08-11', 2300, 260.5, 70, 120,
+                    '2026-08-12T00:00:00+00:00'
+                );
+                """);
+            await migrator.MigrateAsync();
+        }
+
+        await using var migratedContext = new HealthMetricsDbContext(options);
+        var snapshot = await migratedContext.DailyMetricSnapshots.SingleAsync();
+
+        Assert.Equal(21.14m, snapshot.EstimatedAlcoholGrams);
+        Assert.Equal(
+            1,
+            await ScalarAsync<long>(
+                connection,
+                "SELECT COUNT(*) FROM pragma_table_info('daily_metric_snapshots') WHERE name = 'EstimatedAlcoholGrams'"));
+    }
+
     private static string LegacyConnectionTable => "fit" + "bit_connections";
 
     private static string LegacyUserIdColumn => "Fit" + "bitUserId";

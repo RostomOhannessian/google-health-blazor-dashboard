@@ -32,7 +32,7 @@ internal sealed class DemoSeedService(HealthMetricsDbContext dbContext) : IDemoS
                 var weeklyTarget = Math.Round((decimal)(new Random(weekStart.DayNumber).NextDouble() * 250 + 350), 1);
                 var cardioLoad = Math.Round((decimal)(rng.NextDouble() * 55 + 45), 1);
 
-                dbContext.DailyMetricSnapshots.Add(new DailyMetricSnapshot
+                var snapshot = new DailyMetricSnapshot
                 {
                     UserKey = LocalUser.Key,
                     MetricDate = date,
@@ -50,7 +50,9 @@ internal sealed class DemoSeedService(HealthMetricsDbContext dbContext) : IDemoS
                     FatGrams = Math.Round((decimal)(rng.NextDouble() * 40 + 55), 1),
                     ProteinGrams = Math.Round((decimal)(rng.NextDouble() * 50 + 80), 1),
                     CapturedAtUtc = DateTimeOffset.UtcNow
-                });
+                };
+                NutritionEnergyEstimator.UpdateEstimatedAlcoholGrams(snapshot);
+                dbContext.DailyMetricSnapshots.Add(snapshot);
 
                 inserted++;
             }

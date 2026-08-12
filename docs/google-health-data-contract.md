@@ -19,6 +19,7 @@ contract and the locally persisted fields that accompany it.
 | `CarbohydratesGrams` | `nutrition-log` | `dailyRollUp` | Total carbohydrate rollup in grams. |
 | `FatGrams` | `nutrition-log` | `dailyRollUp` | Total fat rollup in grams. |
 | `ProteinGrams` | `nutrition-log` | `dailyRollUp` | Nutrient rollup for `PROTEIN`. |
+| `EstimatedAlcoholGrams` | — | local calculation | Remaining energy after carbohydrate (4 kcal/g), fat (9 kcal/g), and protein (4 kcal/g), divided by 7 kcal/g. Complete nutrition rows with less than 70 kcal remaining are stored as `0`; incomplete rows remain `null`. |
 
 ## Date and range behavior
 
@@ -82,7 +83,7 @@ Danger Zone** above 1.5. A missing ratio is displayed as `—`.
 this header and column order:
 
 ```text
-Date,RestingHR_bpm,HRV_RMSSD_ms,DailyVO2Max_ml_kg_min,RunVO2Max_ml_kg_min,ManualCardioLoad,ManualTargetLoad,ManualACWR,SleepEfficiency_pct,DeepSleep_min,RemSleep_min,Calories_kcal,Carbs_g,Fat_g,Protein_g
+Date,RestingHR_bpm,HRV_RMSSD_ms,DailyVO2Max_ml_kg_min,RunVO2Max_ml_kg_min,ManualCardioLoad,ManualTargetLoad,ManualACWR,SleepEfficiency_pct,DeepSleep_min,RemSleep_min,Calories_kcal,Carbs_g,Fat_g,Protein_g,AlcoholEstimate_g
 ```
 
 Null fields are emitted as empty CSV cells. The table and cards use an em dash

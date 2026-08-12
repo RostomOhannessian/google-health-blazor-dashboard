@@ -372,6 +372,143 @@ window.HealthCharts = (function () {
             charts[canvasId].cleanup = bindHistoryScroll(canvasId, scrollId, chart, visibleDayCount);
         },
 
+        renderConsumption(
+            canvasId,
+            labels,
+            caloriesData,
+            carbohydratesData,
+            fatData,
+            proteinData,
+            estimatedAlcoholData,
+            visibleDayCount,
+            scrollId) {
+            destroyChart(canvasId);
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+
+            const hasCalories = caloriesData.some(v => v !== null);
+            const gramSeries = [
+                {
+                    label: "Carbohydrates (g)",
+                    data: carbohydratesData,
+                    borderColor: "rgb(13, 110, 253)",
+                    backgroundColor: "rgba(13, 110, 253, 0.08)"
+                },
+                {
+                    label: "Fat (g)",
+                    data: fatData,
+                    borderColor: "rgb(255, 193, 7)",
+                    backgroundColor: "rgba(255, 193, 7, 0.08)"
+                },
+                {
+                    label: "Protein (g)",
+                    data: proteinData,
+                    borderColor: "rgb(25, 135, 84)",
+                    backgroundColor: "rgba(25, 135, 84, 0.08)"
+                },
+                {
+                    label: "Alcohol estimate (g)",
+                    data: estimatedAlcoholData,
+                    borderColor: "rgb(111, 66, 193)",
+                    backgroundColor: "rgba(111, 66, 193, 0.08)"
+                }
+            ];
+            const hasGramValues = gramSeries.some(series => series.data.some(value => value !== null));
+            const datasets = [];
+
+            if (hasCalories) {
+                datasets.push({
+                    label: "Calories (kcal)",
+                    data: caloriesData,
+                    borderColor: "rgb(220, 53, 69)",
+                    backgroundColor: "rgba(220, 53, 69, 0.08)",
+                    tension: 0.3,
+                    spanGaps: true,
+                    yAxisID: "yCalories"
+                });
+            }
+
+            gramSeries
+                .filter(series => series.data.some(value => value !== null))
+                .forEach(series => {
+                    datasets.push({
+                        ...series,
+                        tension: 0.3,
+                        spanGaps: true,
+                        yAxisID: "yGrams"
+                    });
+                });
+
+            const colors = themeColors();
+            const windowDays = visibleWindowDayCount(labels.length, visibleDayCount);
+            const latestStart = latestWindowStart(labels.length, visibleDayCount);
+            const scales = {
+                x: {
+                    min: latestStart,
+                    max: Math.max(0, latestStart + windowDays - 1),
+                    title: { display: false, color: colors.muted },
+                    ticks: {
+                        color: colors.muted,
+                        callback: chartTickCallback
+                    },
+                    grid: { color: colors.grid },
+                    border: { color: colors.grid }
+                }
+            };
+            if (hasCalories) {
+                scales.yCalories = {
+                    type: "linear",
+                    position: "left",
+                    beginAtZero: true,
+                    title: { display: true, text: "Calories (kcal)", color: colors.muted },
+                    ticks: { color: colors.muted },
+                    grid: { color: colors.grid },
+                    border: { color: colors.grid }
+                };
+            }
+            if (hasGramValues) {
+                scales.yGrams = {
+                    type: "linear",
+                    position: hasCalories ? "right" : "left",
+                    beginAtZero: true,
+                    title: { display: true, text: "Amount (g)", color: colors.muted },
+                    ticks: { color: colors.muted },
+                    grid: { drawOnChartArea: !hasCalories, color: colors.grid },
+                    border: { color: colors.grid }
+                };
+            }
+
+            const chart = new Chart(canvas, {
+                type: "line",
+                data: { labels, datasets },
+                options: {
+                    responsive: true,
+                    animation: false,
+                    maintainAspectRatio: false,
+                    interaction: { mode: "index", intersect: false },
+                    plugins: {
+                        legend: { position: "top", labels: { color: colors.text } },
+                        tooltip: {
+                            callbacks: {
+                                title: chartTooltipTitle
+                            },
+                            titleColor: colors.text,
+                            bodyColor: colors.text,
+                            backgroundColor: colors.tooltipBackground,
+                            borderColor: colors.grid,
+                            borderWidth: 1
+                        }
+                    },
+                    scales
+                }
+            });
+            charts[canvasId] = {
+                chart,
+                cleanup: () => { }
+            };
+            charts[canvasId].cleanup = bindHistoryScroll(canvasId, scrollId, chart, visibleDayCount);
+        },
+
         renderLoad(
             canvasId,
             labels,

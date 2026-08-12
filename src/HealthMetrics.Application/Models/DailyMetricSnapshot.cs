@@ -36,5 +36,7 @@ public sealed class DailyMetricSnapshot
 
     public decimal? ProteinGrams { get; set; }
 
+    public decimal? EstimatedAlcoholGrams { get; set; }
+
     public DateTimeOffset CapturedAtUtc { get; set; } = DateTimeOffset.UtcNow;
 }

@@ -55,12 +55,16 @@ ratio. Weekly targets are associated with Monday-through-Sunday weeks and are
 written to each of the selected week's seven daily records, creating missing
 records as needed, then projected across displayed days. The table exposes
 manual values and the ratio with `—` fallbacks. Chart.js keeps Heart & HRV
-separate from the load view. Both charts load the full local history and open
-on the selected newest window with a horizontal history scrollbar. The load
-view sums daily manual Cardio Load by Monday-starting week and plots the weekly
-target and latest available manual ratio on the right axis. The table keeps the
-full history behind a compact fixed vertical viewport of about 12 rows, and its
-date-sorted weekly summaries can be toggled on or off.
+separate from the load and nutrition-consumption views. The alcohol estimate
+uses energy remaining after carbohydrate, fat, and protein; it remains zero
+until the residual reaches 70 kcal (10 g at 7 kcal/g). All charts load the full
+local history and open on the selected newest window with a horizontal history
+scrollbar. The load view sums daily manual Cardio Load by Monday-starting week
+and plots the weekly target and latest available manual ratio on the right
+axis. The consumption view keeps calories on a separate axis from gram-based
+amounts. The table keeps the full history behind a compact fixed vertical
+viewport of about 12 rows, and its date-sorted weekly summaries can be toggled
+on or off.
 The CSV endpoint exports the persisted source and derived values, including
 deep/REM minutes, with invariant-culture numeric formatting.
 

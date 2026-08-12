@@ -21,7 +21,8 @@ public sealed class WeeklyMetricAveragesTests
                     TargetLoad = 500m,
                     SleepEfficiency = 80m,
                     ConsumedCaloriesKcal = 2000,
-                    CarbohydratesGrams = 250m
+                    CarbohydratesGrams = 250m,
+                    EstimatedAlcoholGrams = 20m
                 },
                 new DailyMetricSnapshot
                 {
@@ -33,7 +34,8 @@ public sealed class WeeklyMetricAveragesTests
                     TargetLoad = 500m,
                     SleepEfficiency = 90m,
                     ConsumedCaloriesKcal = 2200,
-                    CarbohydratesGrams = null
+                    CarbohydratesGrams = null,
+                    EstimatedAlcoholGrams = 0m
                 },
                 new DailyMetricSnapshot
                 {
@@ -50,6 +52,7 @@ public sealed class WeeklyMetricAveragesTests
         Assert.Equal(85m, summary.SleepEfficiency);
         Assert.Equal(2100m, summary.ConsumedCaloriesKcal);
         Assert.Equal(250m, summary.CarbohydratesGrams);
+        Assert.Equal(10m, summary.EstimatedAlcoholGrams);
     }
 
     [Fact]
@@ -63,5 +66,6 @@ public sealed class WeeklyMetricAveragesTests
         Assert.Null(summary.HrvRmssdMilliseconds);
         Assert.Null(summary.CardioLoadTotal);
         Assert.Null(summary.ProteinGrams);
+        Assert.Null(summary.EstimatedAlcoholGrams);
     }
 }

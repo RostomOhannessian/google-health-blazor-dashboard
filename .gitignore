@@ -16,6 +16,7 @@
 
 # Test and tooling artifacts
 TestResults/
+coverage/
 *.trx
 *.coverage
 *.coveragexml
